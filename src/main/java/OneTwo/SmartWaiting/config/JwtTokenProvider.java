@@ -17,7 +17,7 @@ import java.util.Date;
 @RequiredArgsConstructor
 public class JwtTokenProvider {
 
-    @Value("${jwt.secret-key}" )
+    @Value("${jwt.secret}" )
     private String secretKey;
 
     @Value("${jwt.expiration-ms}" )
