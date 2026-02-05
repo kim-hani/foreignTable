@@ -1,5 +1,6 @@
 package OneTwo.SmartWaiting.auth.dto.controller;
 
+import OneTwo.SmartWaiting.auth.dto.requestDto.AdminSignUpRequestDto;
 import OneTwo.SmartWaiting.auth.dto.requestDto.SignInRequestDto;
 import OneTwo.SmartWaiting.auth.dto.requestDto.SignUpRequestDto;
 import OneTwo.SmartWaiting.auth.dto.responseDto.SignInResponseDto;
@@ -20,6 +21,7 @@ public class AuthController {
 
     private final AuthService authService;
 
+    // ===== 일반 회원 ======
     @PostMapping("/signup")
     public ResponseEntity<SignUpResponseDto> signup(@RequestBody @Valid SignUpRequestDto request) {
         return ResponseEntity.ok(authService.signup(request));
@@ -28,5 +30,16 @@ public class AuthController {
     @PostMapping("/signin")
     public ResponseEntity<SignInResponseDto> signin(@RequestBody @Valid SignInRequestDto request) {
         return ResponseEntity.ok(authService.signin(request));
+    }
+
+    // ===== 관리자 ======
+    @PostMapping("/admin/signup")
+    public ResponseEntity<SignUpResponseDto> signupAdmin(@RequestBody @Valid AdminSignUpRequestDto request) {
+        return ResponseEntity.ok(authService.signupAdmin(request));
+    }
+
+    @PostMapping("/admin/signin")
+    public ResponseEntity<SignInResponseDto> signinAdmin(@RequestBody @Valid SignInRequestDto request) {
+        return ResponseEntity.ok(authService.signinAdmin(request));
     }
 }
