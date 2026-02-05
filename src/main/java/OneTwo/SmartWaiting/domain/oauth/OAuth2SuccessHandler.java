@@ -33,7 +33,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                 .orElseThrow(() -> new IllegalArgumentException("가입된 사용자가 없습니다."));
 
         // 3. JWT 토큰 생성
-        String token = jwtTokenProvider.createToken(email, member.getRole().name());
+        String token = jwtTokenProvider.createAccessToken(email, member.getRole().name());
 
         // 4. 토큰을 가지고 메인 화면으로 리다이렉트 (쿼리 파라미터로 전달)
         String targetUrl = UriComponentsBuilder.fromUriString("/")

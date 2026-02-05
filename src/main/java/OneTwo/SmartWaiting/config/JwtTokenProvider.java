@@ -20,10 +20,13 @@ public class JwtTokenProvider {
     @Value("${jwt.secret}" )
     private String secretKey;
 
-    @Value("${jwt.expiration}" )
-    private long tokenValidityInMilliseconds;
+    @Value("${jwt.expiration}")
+    private long accessTokenValidity;
 
     private Key key;
+
+    @Value("${jwt.refresh-expiration}")
+    private long REFRESH_TOKEN_VALIDITY;
 
     @PostConstruct
     protected void init() {
@@ -31,15 +34,27 @@ public class JwtTokenProvider {
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String createToken(String email, String role) {
+    public String createAccessToken(String email, String role) {
         Claims claims = Jwts.claims().setSubject(email);
         claims.put("role", role);
 
         Date now = new Date();
-        Date validity = new Date(now.getTime() + tokenValidityInMilliseconds);
+        Date validity = new Date(now.getTime() + accessTokenValidity);
 
         return Jwts.builder()
                 .setClaims(claims)
+                .setIssuedAt(now)
+                .setExpiration(validity)
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String createRefreshToken() {
+        Date now = new Date();
+        Date validity = new Date(now.getTime() + REFRESH_TOKEN_VALIDITY);
+
+        // 리프레시 토큰은 안에 정보를 담을 필요 없이 유효기간만 있으면 됨
+        return Jwts.builder()
                 .setIssuedAt(now)
                 .setExpiration(validity)
                 .signWith(key, SignatureAlgorithm.HS256)

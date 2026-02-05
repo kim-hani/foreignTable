@@ -41,3 +41,7 @@ logging:
 jwt:
   secret: ${JWT_SECRET}  # 변수로 변경
   expiration: 86400000
+  refresh-expiration: 604800000
+
+admin:
+  secret-key: ${ADMIN_SECRET_KEY}
