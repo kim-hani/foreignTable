@@ -23,5 +23,12 @@ public class Member extends BaseEntity {
     @Column(nullable = false)
     private UserRole role;
 
+    @Column(unique = true)
+    private String loginId;
+
+    private String password;
+
+    private String provider;
+
 
 }
