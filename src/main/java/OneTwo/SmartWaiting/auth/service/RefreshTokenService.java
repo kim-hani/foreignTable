@@ -13,7 +13,7 @@ public class RefreshTokenService {
     private final RefreshTokenRepository refreshTokenRepository;
 
     @Transactional
-    public void saveOrUpdate(String key,String token){
+    public void saveOrUpdate(String key, String token) {
         RefreshToken refreshToken = refreshTokenRepository.findByKey(key)
                 .orElse(RefreshToken.builder()
                         .key(key)

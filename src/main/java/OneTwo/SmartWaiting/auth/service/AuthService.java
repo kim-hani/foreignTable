@@ -32,6 +32,10 @@ public class AuthService {
     public SignUpResponseDto signup(SignUpRequestDto requestDto) {
         validation(requestDto.email(),requestDto.loginId());
 
+        if(!requestDto.password().equals(requestDto.passwordCheck())) {
+            throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+        }
+
         Member member = Member.builder()
                 .email(requestDto.email())
                 .loginId(requestDto.loginId())
@@ -84,7 +88,7 @@ public class AuthService {
 
         return createTokenResponse(admin);
     }
-    
+
 
     // ====== 공통 로직 ======
     private void validation(String email, String loginId) {
