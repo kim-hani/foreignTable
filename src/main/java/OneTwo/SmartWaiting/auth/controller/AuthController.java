@@ -1,4 +1,4 @@
-package OneTwo.SmartWaiting.auth.dto.controller;
+package OneTwo.SmartWaiting.auth.controller;
 
 import OneTwo.SmartWaiting.auth.dto.requestDto.AdminSignUpRequestDto;
 import OneTwo.SmartWaiting.auth.dto.requestDto.SignInRequestDto;
