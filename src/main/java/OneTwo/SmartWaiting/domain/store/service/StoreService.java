@@ -1,5 +1,8 @@
 package OneTwo.SmartWaiting.domain.store.service;
 
+import OneTwo.SmartWaiting.domain.member.entity.Member;
+import OneTwo.SmartWaiting.domain.member.enums.UserRole;
+import OneTwo.SmartWaiting.domain.member.repository.MemberRepository;
 import OneTwo.SmartWaiting.domain.store.dto.requestDto.StoreCreateRequestDto;
 import OneTwo.SmartWaiting.domain.store.dto.responseDto.StoreResponseDto;
 import OneTwo.SmartWaiting.domain.store.entity.Store;
@@ -20,14 +23,22 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class StoreService {
 
+    private final MemberRepository memberRepository;
     private final StoreRepository storeRepository;
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
     // 식당 생성
     @Transactional
     public Long createStore(StoreCreateRequestDto request) {
-        Point location = geometryFactory.createPoint(new Coordinate(request.longitude(), request.latitude()));
 
+        Member member = memberRepository.findById(request.ownerId())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+
+        if(member.getRole() != UserRole.OWNER) {
+            throw new IllegalArgumentException("식당 등록 권한이 없습니다.");
+        }
+
+        Point location = geometryFactory.createPoint(new Coordinate(request.longitude(), request.latitude()));
 
         Store store = Store.builder()
                 .ownerId(request.ownerId())

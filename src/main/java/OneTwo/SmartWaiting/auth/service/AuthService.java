@@ -29,7 +29,7 @@ public class AuthService {
 
     // ====== 일반 사용자 로직 ======
     @Transactional
-    public SignUpResponseDto signup(SignUpRequestDto requestDto) {
+    public SignUpResponseDto signupMember(SignUpRequestDto requestDto) {
         validation(requestDto.email(),requestDto.loginId());
 
         if(!requestDto.password().equals(requestDto.passwordCheck())) {
@@ -49,13 +49,34 @@ public class AuthService {
     }
 
     @Transactional
-    public SignInResponseDto signin(SignInRequestDto requestDto) {
+    public SignInResponseDto signinMember(SignInRequestDto requestDto) {
        Member member = validateMember(requestDto.loginId(), requestDto.password());
 
        return createTokenResponse(member);
     }
 
 
+
+    // ===== 사장님 회원가입 ======
+    @Transactional
+    public SignInResponseDto signupOwner(SignUpRequestDto requestDto) {
+        validation(requestDto.email(),requestDto.loginId());
+
+        if(!requestDto.password().equals(requestDto.passwordCheck())) {
+            throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+        }
+
+        Member owner = Member.builder()
+                .email(requestDto.email())
+                .loginId(requestDto.loginId())
+                .password(passwordEncoder.encode(requestDto.password()))
+                .nickname(requestDto.nickname())
+                .role(UserRole.OWNER)
+                .provider("general")
+                .build();
+
+        return createTokenResponse(memberRepository.save(owner));
+    }
 
     // ====== 관리자 로직 ======
     @Transactional

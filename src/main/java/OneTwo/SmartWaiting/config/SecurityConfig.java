@@ -5,6 +5,7 @@ import OneTwo.SmartWaiting.domain.oauth.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -35,6 +36,13 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/login/**", "/oauth2/**", "/error").permitAll() // 로그인 관련 페이지 허용
                         .requestMatchers("/api/v1/**").permitAll()
+
+                        .requestMatchers(HttpMethod.POST, "/api/v1/stores").hasRole("OWNER")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/stores/**").hasRole("OWNER")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/stores/**").hasRole("OWNER")
+
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/stores/**").hasAnyRole("ADMIN", "OWNER")
+
                         .anyRequest().authenticated() // 나머지는 다 로그인(JWT) 필요
                 )
                 .oauth2Login(oauth2 -> oauth2
