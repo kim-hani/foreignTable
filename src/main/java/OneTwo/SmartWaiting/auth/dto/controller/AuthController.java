@@ -24,12 +24,18 @@ public class AuthController {
     // ===== 일반 회원 ======
     @PostMapping("/signup")
     public ResponseEntity<SignUpResponseDto> signup(@RequestBody @Valid SignUpRequestDto request) {
-        return ResponseEntity.ok(authService.signup(request));
+        return ResponseEntity.ok(authService.signupMember(request));
     }
 
     @PostMapping("/signin")
     public ResponseEntity<SignInResponseDto> signin(@RequestBody @Valid SignInRequestDto request) {
-        return ResponseEntity.ok(authService.signin(request));
+        return ResponseEntity.ok(authService.signinMember(request));
+    }
+
+    // ===== 사장님 ======
+    @PostMapping("/owner/signup")
+    public ResponseEntity<SignInResponseDto> signupOwner(@RequestBody @Valid SignUpRequestDto request) {
+        return ResponseEntity.ok(authService.signupOwner(request));
     }
 
     // ===== 관리자 ======
