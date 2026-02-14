@@ -17,13 +17,6 @@ public class MemberController {
 
     private final MemberService memberService;
 
-    // 1. 회원가입
-    @PostMapping
-    public ResponseEntity<Long> signup(@RequestBody @Valid MemberSignUpRequestDto request) {
-        Long memberId = memberService.signup(request);
-        return ResponseEntity.created(URI.create("/api/v1/members/" + memberId)).body(memberId);
-    }
-
     // 2. 내 정보 조회
     @GetMapping("/{memberId}")
     public ResponseEntity<MemberResponseDto> getMember(@PathVariable Long memberId) {
