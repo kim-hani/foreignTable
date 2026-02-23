@@ -1,13 +1,9 @@
 package OneTwo.SmartWaiting.domain.store.entity;
 
 import OneTwo.SmartWaiting.common.domain.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
-import lombok.AccessLevel;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import OneTwo.SmartWaiting.domain.store.enums.StoreCategory;
+import jakarta.persistence.*;
+import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.locationtech.jts.geom.Point;
@@ -20,6 +16,7 @@ import java.util.Map;
 @Getter
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class Store extends BaseEntity {
 
     @Column(nullable = false)
@@ -31,8 +28,9 @@ public class Store extends BaseEntity {
     @Column(nullable = false)
     private String phone;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String category;
+    private StoreCategory category;
 
     @Column(nullable = false)
     @Builder.Default
@@ -53,14 +51,13 @@ public class Store extends BaseEntity {
     @Column(name = "menuItems",columnDefinition = "jsonb")
     private List<MenuItemVo> menuItems;
 
-    public Store(Long ownerId, String name, String phone,String category, Integer averageWaiting,Point location,
-                       Map<String, String> businessHours, List<MenuItemVo> menuItems) {
-        this.ownerId = ownerId;
+    public void updateInfo(String name, String phone, StoreCategory category, Integer averageWaiting,
+                           Point location, Map<String, String> businessHours, List<MenuItemVo> menuItems) {
         this.name = name;
         this.phone = phone;
         this.category = category;
-        this.averageWaiting = averageWaiting;
-        this.location = location;
+        this.averageWaiting = averageWaiting != null ? averageWaiting : this.averageWaiting;
+        this.location = location; // 위치 업데이트
         this.businessHours = businessHours;
         this.menuItems = menuItems;
     }
