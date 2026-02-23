@@ -17,7 +17,7 @@ public record StoreCreateRequestDto(
         @NotBlank(message = "식당 이름은 필수입니다.")
         String name,
 
-        @NotBlank(message = "카테고리는 필수입니다.")
+        @NotNull(message = "카테고리는 필수입니다.")
         StoreCategory category,
 
         String phone,
