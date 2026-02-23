@@ -2,6 +2,7 @@ package OneTwo.SmartWaiting.domain.store.dto.responseDto;
 
 import OneTwo.SmartWaiting.domain.store.entity.MenuItemVo;
 import OneTwo.SmartWaiting.domain.store.entity.Store;
+import OneTwo.SmartWaiting.domain.store.enums.StoreCategory;
 
 import java.util.List;
 import java.util.Map;
@@ -9,7 +10,7 @@ import java.util.Map;
 public record StoreResponseDto(
         Long storeId,
         String name,
-        String category,
+        StoreCategory category,
         String phone,
         Double latitude,
         Double longitude,

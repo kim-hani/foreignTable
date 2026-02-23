@@ -4,8 +4,10 @@ import OneTwo.SmartWaiting.domain.member.entity.Member;
 import OneTwo.SmartWaiting.domain.member.enums.UserRole;
 import OneTwo.SmartWaiting.domain.member.repository.MemberRepository;
 import OneTwo.SmartWaiting.domain.store.dto.requestDto.StoreCreateRequestDto;
+import OneTwo.SmartWaiting.domain.store.dto.requestDto.StoreUpdateRequestDto;
 import OneTwo.SmartWaiting.domain.store.dto.responseDto.StoreResponseDto;
 import OneTwo.SmartWaiting.domain.store.entity.Store;
+import OneTwo.SmartWaiting.domain.store.enums.StoreCategory;
 import OneTwo.SmartWaiting.domain.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
 import org.locationtech.jts.geom.Coordinate;
@@ -68,5 +70,43 @@ public class StoreService {
                 .stream()
                 .map(StoreResponseDto::from)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void updateStore(Long storeId, Long requesterId, StoreUpdateRequestDto request) {
+        Store store = findStoreOrThrow(storeId);
+        validateOwner(store, requesterId);
+
+        // 수정된 위경도를 바탕으로 다시 Point 객체 생성
+        Point updatedLocation = geometryFactory.createPoint(new Coordinate(request.longitude(), request.latitude()));
+
+        store.updateInfo(
+                request.name(),
+                request.phone(),
+                StoreCategory.from(request.category()),
+                request.averageWaiting(),
+                updatedLocation, // 위치 정보 전달
+                request.businessHours(),
+                request.menuItems()
+        );
+    }
+
+    @Transactional
+    public void deleteStore(Long storeId, Long requesterId) {
+        Store store = findStoreOrThrow(storeId);
+        validateOwner(store, requesterId);
+
+        store.softDelete();
+    }
+
+    private Store findStoreOrThrow(Long storeId) {
+        return storeRepository.findById(storeId)
+                .orElseThrow(() -> new IllegalArgumentException("식당을 찾을 수 없습니다."));
+    }
+
+    private void validateOwner(Store store, Long requesterId) {
+        if (!store.getOwnerId().equals(requesterId)) {
+            throw new IllegalArgumentException("해당 가게에 대한 권한이 없습니다.");
+        }
     }
 }

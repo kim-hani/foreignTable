@@ -1,6 +1,7 @@
 package OneTwo.SmartWaiting.domain.store.controller;
 
 import OneTwo.SmartWaiting.domain.store.dto.requestDto.StoreCreateRequestDto;
+import OneTwo.SmartWaiting.domain.store.dto.requestDto.StoreUpdateRequestDto;
 import OneTwo.SmartWaiting.domain.store.dto.responseDto.StoreResponseDto;
 import OneTwo.SmartWaiting.domain.store.service.StoreService;
 import jakarta.validation.Valid;
@@ -39,5 +40,23 @@ public class StoreController {
             @RequestParam(defaultValue = "1000") double radius) {
 
         return ResponseEntity.ok(storeService.searchStoresAround(lat, lng, radius));
+    }
+
+    @PutMapping("/{storeId}")
+    public ResponseEntity<Void> updateStore(
+            @PathVariable Long storeId,
+            @RequestParam Long ownerId,
+            @RequestBody @Valid StoreUpdateRequestDto request) {
+
+        storeService.updateStore(storeId, ownerId, request);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{storeId}")
+    public ResponseEntity<Void> deleteStore(
+            @PathVariable Long storeId,
+            @RequestParam Long ownerId){
+        storeService.deleteStore(storeId, ownerId);
+        return ResponseEntity.noContent().build();
     }
 }
