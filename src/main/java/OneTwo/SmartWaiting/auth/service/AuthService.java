@@ -33,7 +33,7 @@ public class AuthService {
 
     // ====== 일반 사용자 로직 ======
     @Transactional
-    public SignUpResponseDto signupMember(SignUpRequestDto requestDto) {
+    public SignInResponseDto signupMember(SignUpRequestDto requestDto) {
         validation(requestDto.email(),requestDto.loginId());
 
         if(!requestDto.password().equals(requestDto.passwordCheck())) {
@@ -49,7 +49,7 @@ public class AuthService {
                 .provider("general")
                 .build();
 
-        return SignUpResponseDto.from(memberRepository.save(member));
+        return createTokenResponse(memberRepository.save(member));
     }
 
     @Transactional

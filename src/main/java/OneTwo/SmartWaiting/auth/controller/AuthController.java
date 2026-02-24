@@ -23,7 +23,7 @@ public class AuthController {
 
     // ===== 일반 회원 ======
     @PostMapping("/signup")
-    public ResponseEntity<SignUpResponseDto> signup(@RequestBody @Valid SignUpRequestDto request) {
+    public ResponseEntity<SignInResponseDto> signup(@RequestBody @Valid SignUpRequestDto request) {
         return ResponseEntity.ok(authService.signupMember(request));
     }
 
