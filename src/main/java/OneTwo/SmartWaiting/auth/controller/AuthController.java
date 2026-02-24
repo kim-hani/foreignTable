@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.security.Principal;
+
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
@@ -56,5 +58,12 @@ public class AuthController {
 
         // AuthService에 만들어둔 reissueToken 메서드 호출
         return ResponseEntity.ok(authService.reissueToken(request));
+    }
+
+    // ===== 로그아웃 ======
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(Principal principal) {
+        authService.logout(principal.getName());
+        return ResponseEntity.ok().build();
     }
 }

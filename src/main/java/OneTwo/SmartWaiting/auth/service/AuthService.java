@@ -114,6 +114,14 @@ public class AuthService {
         return createTokenResponse(admin);
     }
 
+    // 로그아웃
+    @Transactional
+    public void logout(String email){
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
+
+        refreshTokenRepository.deleteById(String.valueOf(member.getId()));
+    }
 
     // ====== 공통 로직 ======
     private void validation(String email, String loginId) {
@@ -164,6 +172,10 @@ public class AuthService {
         Long memberId = Long.parseLong(savedToken.getKey());
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
+
+        if(member.getIsDeleted() == Boolean.TRUE){
+            throw new IllegalArgumentException("존재하지 않는 회원입니다.");
+        }
 
         // 4. 새로운 Access Token 및 Refresh Token 발급 (기존 createTokenResponse 재활용!)
         return createTokenResponse(member);
