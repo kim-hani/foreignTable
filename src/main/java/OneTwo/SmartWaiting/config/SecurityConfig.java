@@ -37,11 +37,14 @@ public class SecurityConfig {
                         .requestMatchers("/", "/login/**", "/oauth2/**", "/error").permitAll() // 로그인 관련 페이지 허용
                         .requestMatchers("/api/v1/auth/**").permitAll()
 
+                        .requestMatchers(HttpMethod.GET,"/api/v1/stores/**").permitAll()
+
                         .requestMatchers(HttpMethod.POST, "/api/v1/stores").hasRole("OWNER")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/stores/**").hasRole("OWNER")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/stores/**").hasRole("OWNER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/stores/**").hasAnyRole("ADMIN","OWNER")
 
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/stores/**").hasAnyRole("ADMIN", "OWNER")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/waitings/*/status").hasRole("OWNER")
 
                         .anyRequest().authenticated() // 나머지는 다 로그인(JWT) 필요
                 )

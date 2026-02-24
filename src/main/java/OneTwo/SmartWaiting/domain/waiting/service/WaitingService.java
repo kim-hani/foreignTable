@@ -91,7 +91,7 @@ public class WaitingService {
         Member member = memberRepository.findByEmail(email)
                 .orElseThrow(()-> new IllegalArgumentException("회원을 찾을 수 없습니다."));
 
-        if(!waiting.getStore().getId().equals(member.getId())) {
+        if(!waiting.getStore().getOwnerId().equals(member.getId())) {
             throw new IllegalArgumentException("식당 주인만 대기 상태를 변경할 수 있습니다.");
         }
         waiting.changeStatus(request.status());
