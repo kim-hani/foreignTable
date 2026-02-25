@@ -77,11 +77,27 @@ public class WaitingService {
                 .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
 
         return waitingRepository.findAllByMemberId(member.getId()).stream()
-                .map(WaitingResponse::from)
+                .map(waiting -> {
+                    Long teamsAhead = 0L;
+                    Integer expectedWaitMin = 0;
+
+                    if (waiting.getStatus() == WaitingStatus.WAITING) {
+                        teamsAhead = waitingRepository.countByStoreIdAndStatusAndCreatedAtLessThan(
+                                waiting.getStore().getId(),
+                                WaitingStatus.WAITING,
+                                waiting.getCreatedAt()
+                        );
+
+                        expectedWaitMin = (int) (teamsAhead * waiting.getStore().getAverageWaiting());
+                    }
+
+
+                    return WaitingResponse.of(waiting, teamsAhead, expectedWaitMin);
+                })
                 .collect(Collectors.toList());
     }
 
-    public List<WaitingResponse> getStoreWaitings(Long storeId, WaitingStatus status,String email) {
+    public List<WaitingResponse> getStoreWaitings(Long storeId, WaitingStatus status, String email) {
         Member member = memberRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
 
@@ -93,7 +109,7 @@ public class WaitingService {
         }
 
         return waitingRepository.findAllByStoreIdAndStatus(storeId, status).stream()
-                .map(WaitingResponse::from)
+                .map(waiting -> WaitingResponse.of(waiting, 0L, 0))
                 .collect(Collectors.toList());
     }
 
