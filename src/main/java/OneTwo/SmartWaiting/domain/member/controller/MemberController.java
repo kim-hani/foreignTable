@@ -2,6 +2,7 @@ package OneTwo.SmartWaiting.domain.member.controller;
 
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.MemberSignUpRequestDto;
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.MemberUpdateRequestDto;
+import OneTwo.SmartWaiting.domain.member.dto.requestDto.PasswordUpdateRequestDto;
 import OneTwo.SmartWaiting.domain.member.dto.responseDto.MemberResponseDto;
 import OneTwo.SmartWaiting.domain.member.service.MemberService;
 import jakarta.validation.Valid;
@@ -35,6 +36,14 @@ public class MemberController {
             Principal principal,
             @RequestBody @Valid MemberUpdateRequestDto request) {
         memberService.updateMember(principal.getName(), request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PatchMapping("/me/password")
+    public ResponseEntity<Void> updatePassword(
+            Principal principal,
+            @RequestBody @Valid PasswordUpdateRequestDto request) {
+        memberService.updatePassword(principal.getName(), request);
         return ResponseEntity.ok().build();
     }
 

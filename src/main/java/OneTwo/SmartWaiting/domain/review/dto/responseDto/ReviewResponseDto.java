@@ -19,7 +19,7 @@ public record ReviewResponseDto(
                 .content(review.getContent())
                 .rating(review.getRating())
                 .writerNickname(review.getMember().getNickname())
-                .createdAt(LocalDateTime.ofInstant(review.getCreatedAt(), java.time.ZoneId.systemDefault()))
+                .createdAt(review.getCreatedAt())
                 .build();
     }
 }

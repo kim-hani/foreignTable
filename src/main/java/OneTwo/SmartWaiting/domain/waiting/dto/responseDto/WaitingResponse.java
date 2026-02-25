@@ -30,7 +30,7 @@ public record WaitingResponse(
                 .status(waiting.getStatus())
                 .queueNumber(waiting.getQueueNumber())
                 .expectedWaitMin(waiting.getExpectedWaitMin())
-                .createdAt(LocalDateTime.ofInstant(waiting.getCreatedAt(), java.time.ZoneId.systemDefault()))
+                .createdAt(waiting.getCreatedAt())
                 .build();
     }
 }

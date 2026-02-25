@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 
 @RestController
@@ -18,19 +19,23 @@ public class FavoriteController {
     private final FavoriteService favoriteService;
 
     @PostMapping
-    public ResponseEntity<Long> addFavorite(@RequestBody @Valid FavoriteRequestDto requestDto){
-        Long favoriteId = favoriteService.addFavorite(requestDto);
+    public ResponseEntity<Long> addFavorite(
+            Principal principal,
+            @RequestBody @Valid FavoriteRequestDto requestDto){
+        Long favoriteId = favoriteService.addFavorite(requestDto,principal.getName());
         return ResponseEntity.ok(favoriteId);
     }
 
     @DeleteMapping
-    public ResponseEntity<Void> removeFavorite(@RequestBody @Valid FavoriteRequestDto requestDto){
-        favoriteService.removeFavorite(requestDto);
+    public ResponseEntity<Void> removeFavorite(
+            Principal principal,
+            @RequestBody @Valid FavoriteRequestDto requestDto){
+        favoriteService.removeFavorite(requestDto,principal.getName());
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/my")
-    public ResponseEntity<List<FavoriteResponseDto>> getMyFavorites(@RequestParam Long memberId) {
-        return ResponseEntity.ok(favoriteService.getMyFavorites(memberId));
+    public ResponseEntity<List<FavoriteResponseDto>> getMyFavorites(Principal principal) {
+        return ResponseEntity.ok(favoriteService.getMyFavorites(principal.getName()));
     }
 }
