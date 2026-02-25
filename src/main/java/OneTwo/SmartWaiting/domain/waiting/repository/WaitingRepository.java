@@ -17,4 +17,6 @@ public interface WaitingRepository extends JpaRepository<Waiting, Long> {
 
     @Query("SELECT w FROM Waiting w JOIN FETCH w.store WHERE w.member.id = :memberId ORDER BY w.createdAt DESC")
     List<Waiting> findAllByMemberId(@Param("memberId") Long memberId);
+
+    boolean existsByMemberIdAndStoreIdAndStatus(Long memberId, Long storeId, WaitingStatus status);
 }

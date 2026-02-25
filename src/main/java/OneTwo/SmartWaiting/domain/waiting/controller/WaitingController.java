@@ -49,8 +49,10 @@ public class WaitingController {
     @GetMapping("/store/{storeId}")
     public ResponseEntity<List<WaitingResponse>> getStoreWaitings(
             @PathVariable Long storeId,
-            @RequestParam WaitingStatus status) {
-        return ResponseEntity.ok(waitingService.getStoreWaitings(storeId, status));
+            @RequestParam(defaultValue = "WAITING") WaitingStatus status,
+            Principal principal
+    ) {
+        return ResponseEntity.ok(waitingService.getStoreWaitings(storeId, status, principal.getName()));
     }
 
     // 웨이팅 상태 변경

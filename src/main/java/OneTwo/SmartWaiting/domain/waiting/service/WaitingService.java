@@ -35,6 +35,10 @@ public class WaitingService {
         Member member = memberRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
 
+        if(waitingRepository.existsByMemberIdAndStoreIdAndStatus(member.getId(), store.getId(), WaitingStatus.WAITING)) {
+            throw new IllegalArgumentException("이미 대기 중인 식당입니다.");
+        }
+
         long currentWaitingCount = waitingRepository.countByStoreIdAndStatus(store.getId(), WaitingStatus.WAITING);
 
         int myQueueNumber = (int) currentWaitingCount + 1;
@@ -77,7 +81,17 @@ public class WaitingService {
                 .collect(Collectors.toList());
     }
 
-    public List<WaitingResponse> getStoreWaitings(Long storeId, WaitingStatus status) {
+    public List<WaitingResponse> getStoreWaitings(Long storeId, WaitingStatus status,String email) {
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+
+        Store store = storeRepository.findById(storeId)
+                .orElseThrow(() -> new IllegalArgumentException("식당을 찾을 수 없습니다."));
+
+        if (!store.getOwnerId().equals(member.getId())) {
+            throw new IllegalArgumentException("본인의 식당 대기열만 조회할 수 있습니다.");
+        }
+
         return waitingRepository.findAllByStoreIdAndStatus(storeId, status).stream()
                 .map(WaitingResponse::from)
                 .collect(Collectors.toList());
