@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.security.Principal;
 import java.util.List;
 
 @RestController
@@ -21,8 +22,10 @@ public class StoreController {
 
     // 1. 식당 등록
     @PostMapping
-    public ResponseEntity<Long> createStore(@RequestBody @Valid StoreCreateRequestDto request) {
-        Long storeId = storeService.createStore(request);
+    public ResponseEntity<Long> createStore(
+            Principal principal,
+            @RequestBody @Valid StoreCreateRequestDto request) {
+        Long storeId = storeService.createStore(request, principal.getName());
         return ResponseEntity.created(URI.create("/api/v1/stores/" + storeId)).body(storeId);
     }
 
@@ -45,18 +48,17 @@ public class StoreController {
     @PutMapping("/{storeId}")
     public ResponseEntity<Void> updateStore(
             @PathVariable Long storeId,
-            @RequestParam Long ownerId,
+            Principal principal,
             @RequestBody @Valid StoreUpdateRequestDto request) {
-
-        storeService.updateStore(storeId, ownerId, request);
+        storeService.updateStore(storeId, principal.getName(), request);
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/{storeId}")
     public ResponseEntity<Void> deleteStore(
             @PathVariable Long storeId,
-            @RequestParam Long ownerId){
-        storeService.deleteStore(storeId, ownerId);
+            Principal principal) {
+        storeService.deleteStore(storeId, principal.getName());
         return ResponseEntity.noContent().build();
     }
 }

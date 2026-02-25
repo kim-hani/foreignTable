@@ -1,4 +1,4 @@
-package OneTwo.SmartWaiting.auth.dto.controller;
+package OneTwo.SmartWaiting.auth.controller;
 
 import OneTwo.SmartWaiting.auth.dto.requestDto.AdminSignUpRequestDto;
 import OneTwo.SmartWaiting.auth.dto.requestDto.SignInRequestDto;
@@ -47,5 +47,14 @@ public class AuthController {
     @PostMapping("/admin/signin")
     public ResponseEntity<SignInResponseDto> signinAdmin(@RequestBody @Valid SignInRequestDto request) {
         return ResponseEntity.ok(authService.signinAdmin(request));
+    }
+
+    // ===== 토큰 재발급 (Access & Refresh Token) ======
+    @PostMapping("/reissue")
+    public ResponseEntity<SignInResponseDto> reissueToken(
+            @RequestBody @Valid OneTwo.SmartWaiting.auth.dto.requestDto.ReissueRequestDto request) {
+
+        // AuthService에 만들어둔 reissueToken 메서드 호출
+        return ResponseEntity.ok(authService.reissueToken(request));
     }
 }

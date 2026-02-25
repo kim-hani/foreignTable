@@ -31,9 +31,9 @@ public class StoreService {
 
     // 식당 생성
     @Transactional
-    public Long createStore(StoreCreateRequestDto request) {
+    public Long createStore(StoreCreateRequestDto request,String email) {
 
-        Member member = memberRepository.findById(request.ownerId())
+        Member member = memberRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
 
         if(member.getRole() != UserRole.OWNER) {
@@ -43,7 +43,7 @@ public class StoreService {
         Point location = geometryFactory.createPoint(new Coordinate(request.longitude(), request.latitude()));
 
         Store store = Store.builder()
-                .ownerId(request.ownerId())
+                .ownerId(member.getId())
                 .name(request.name())
                 .category(request.category())
                 .averageWaiting(request.averageWaiting() != null ? request.averageWaiting() : 10)
@@ -73,9 +73,9 @@ public class StoreService {
     }
 
     @Transactional
-    public void updateStore(Long storeId, Long requesterId, StoreUpdateRequestDto request) {
+    public void updateStore(Long storeId, String email, StoreUpdateRequestDto request) {
         Store store = findStoreOrThrow(storeId);
-        validateOwner(store, requesterId);
+        validateOwner(store, email);
 
         // 수정된 위경도를 바탕으로 다시 Point 객체 생성
         Point updatedLocation = geometryFactory.createPoint(new Coordinate(request.longitude(), request.latitude()));
@@ -92,9 +92,9 @@ public class StoreService {
     }
 
     @Transactional
-    public void deleteStore(Long storeId, Long requesterId) {
+    public void deleteStore(Long storeId, String email) {
         Store store = findStoreOrThrow(storeId);
-        validateOwner(store, requesterId);
+        validateOwner(store, email);
 
         store.softDelete();
     }
@@ -104,8 +104,11 @@ public class StoreService {
                 .orElseThrow(() -> new IllegalArgumentException("식당을 찾을 수 없습니다."));
     }
 
-    private void validateOwner(Store store, Long requesterId) {
-        if (!store.getOwnerId().equals(requesterId)) {
+    private void validateOwner(Store store, String email) {
+        Member requester = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+
+        if(!store.getOwnerId().equals(requester.getId())) {
             throw new IllegalArgumentException("해당 가게에 대한 권한이 없습니다.");
         }
     }

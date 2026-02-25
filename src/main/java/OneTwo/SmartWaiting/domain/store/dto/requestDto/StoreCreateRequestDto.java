@@ -11,9 +11,6 @@ import java.util.List;
 import java.util.Map;
 
 public record StoreCreateRequestDto(
-        @NotNull(message = "점주 ID는 필수입니다.")
-        Long ownerId,
-
         @NotBlank(message = "식당 이름은 필수입니다.")
         String name,
 

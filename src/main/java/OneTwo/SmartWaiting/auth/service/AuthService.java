@@ -1,10 +1,13 @@
 package OneTwo.SmartWaiting.auth.service;
 
 import OneTwo.SmartWaiting.auth.dto.requestDto.AdminSignUpRequestDto;
+import OneTwo.SmartWaiting.auth.dto.requestDto.ReissueRequestDto;
 import OneTwo.SmartWaiting.auth.dto.requestDto.SignInRequestDto;
 import OneTwo.SmartWaiting.auth.dto.requestDto.SignUpRequestDto;
 import OneTwo.SmartWaiting.auth.dto.responseDto.SignInResponseDto;
 import OneTwo.SmartWaiting.auth.dto.responseDto.SignUpResponseDto;
+import OneTwo.SmartWaiting.auth.entity.RefreshToken;
+import OneTwo.SmartWaiting.auth.repository.RefreshTokenRepository;
 import OneTwo.SmartWaiting.config.JwtTokenProvider;
 import OneTwo.SmartWaiting.domain.member.entity.Member;
 import OneTwo.SmartWaiting.domain.member.enums.UserRole;
@@ -20,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
     private final MemberRepository memberRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final RefreshTokenService refreshTokenService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
@@ -142,6 +146,27 @@ public class AuthService {
                 .refreshToken(refreshToken)
                 .accessTokenExpiresIn(1800000L)
                 .build();
+    }
+
+    // ====== 토큰 재발급 (Reissue) ======
+    @Transactional
+    public SignInResponseDto reissueToken(ReissueRequestDto requestDto) {
+        // 1. Refresh Token이 유효한지(만료되지 않았는지, 위조되지 않았는지) 검증
+        if (!jwtTokenProvider.validateToken(requestDto.refreshToken())) {
+            throw new IllegalArgumentException("Refresh Token이 유효하지 않거나 만료되었습니다. 다시 로그인해주세요.");
+        }
+
+        // 2. DB에서 넘어온 Refresh Token 값으로 저장된 토큰 엔티티 찾기
+        RefreshToken savedToken = refreshTokenRepository.findByValue(requestDto.refreshToken())
+                .orElseThrow(() -> new IllegalArgumentException("서버에 존재하지 않는 Refresh Token입니다."));
+
+        // 3. 찾은 토큰 엔티티의 ID(memberId)로 회원 정보 조회
+        Long memberId = Long.parseLong(savedToken.getKey());
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
+
+        // 4. 새로운 Access Token 및 Refresh Token 발급 (기존 createTokenResponse 재활용!)
+        return createTokenResponse(member);
     }
 
 }

@@ -27,12 +27,12 @@ public class WaitingService {
     private final MemberRepository memberRepository;
 
     @Transactional
-    public Long registerWaiting(WaitingRegisterRequestDto requestDto) {
+    public Long registerWaiting(WaitingRegisterRequestDto requestDto, String email) {
 
         Store store = storeRepository.findById(requestDto.storeId())
                 .orElseThrow(() -> new IllegalArgumentException("식당을 찾을 수 없습니다."));
 
-        Member member = memberRepository.findById(requestDto.memberId())
+        Member member = memberRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
 
         long currentWaitingCount = waitingRepository.countByStoreIdAndStatus(store.getId(), WaitingStatus.WAITING);
@@ -54,14 +54,25 @@ public class WaitingService {
     }
 
     @Transactional
-    public void cancelWaiting(Long waitingId) {
+    public void cancelWaiting(Long waitingId, String email) {
         Waiting waiting = waitingRepository.findById(waitingId)
                 .orElseThrow(() -> new IllegalArgumentException("대기 정보를 찾을 수 없습니다."));
 
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+
+        if (!waiting.getMember().getId().equals(member.getId())) {
+            throw new IllegalArgumentException("본인의 대기 정보만 취소할 수 있습니다.");
+        }
+
         waiting.changeStatus(WaitingStatus.CANCEL);
     }
-    public List<WaitingResponse> getMyWaitings(Long memberId) {
-        return waitingRepository.findAllByMemberId(memberId).stream()
+
+    public List<WaitingResponse> getMyWaitings(String email) {
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+
+        return waitingRepository.findAllByMemberId(member.getId()).stream()
                 .map(WaitingResponse::from)
                 .collect(Collectors.toList());
     }
@@ -73,10 +84,16 @@ public class WaitingService {
     }
 
     @Transactional
-    public void changeStatus(Long waitingId, WaitingChangeRequestDto request) {
+    public void changeStatus(Long waitingId, WaitingChangeRequestDto request, String email) {
         Waiting waiting = waitingRepository.findById(waitingId)
                 .orElseThrow(() -> new IllegalArgumentException("대기 정보를 찾을 수 없습니다."));
 
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(()-> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+
+        if(!waiting.getStore().getOwnerId().equals(member.getId())) {
+            throw new IllegalArgumentException("식당 주인만 대기 상태를 변경할 수 있습니다.");
+        }
         waiting.changeStatus(request.status());
     }
 }
