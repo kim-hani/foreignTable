@@ -7,8 +7,6 @@ import jakarta.validation.constraints.NotNull;
 
 public record ReviewCreateRequestDto(
         @NotNull Long storeId,
-        @NotNull Long memberId,
-
         @NotBlank(message = "내용을 입력해주세요.")
         String content,
 

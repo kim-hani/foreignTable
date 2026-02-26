@@ -1,5 +1,6 @@
 package OneTwo.SmartWaiting.domain.member.service;
 
+import OneTwo.SmartWaiting.auth.repository.RefreshTokenRepository;
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.MemberSignUpRequestDto;
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.MemberUpdateRequestDto;
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.PasswordUpdateRequestDto;
@@ -20,6 +21,7 @@ public class MemberService {
 
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     // 이메일로 회원 정보 조회
     public MemberResponseDto getMyInfo(String email){
@@ -45,7 +47,9 @@ public class MemberService {
     @Transactional
     public void deleteMember(String email) {
         Member member = findMemberByEmailOrThrow(email);
-        member.softDelete();
+
+        member.withdraw();
+        refreshTokenRepository.deleteById(String.valueOf(member.getId()));
     }
 
     @Transactional

@@ -4,6 +4,7 @@ import OneTwo.SmartWaiting.common.domain.BaseEntity;
 import OneTwo.SmartWaiting.domain.member.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "member")
@@ -11,6 +12,7 @@ import lombok.*;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PUBLIC)
+@SQLRestriction("is_deleted = false") // soft delete 적용
 public class Member extends BaseEntity {
 
     @Column(nullable = false, unique = true)
@@ -36,5 +38,14 @@ public class Member extends BaseEntity {
 
     public void updatePassword(String encodedPassword) {
         this.password = encodedPassword;
+    }
+
+    public void withdraw(){
+        super.softDelete();
+
+        this.email = "deleted_" + System.currentTimeMillis() + "_" + this.email;
+        if(this.loginId != null){
+            this.loginId = "deleted_" + System.currentTimeMillis() + "_" + this.loginId;
+        }
     }
 }

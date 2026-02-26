@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.security.Principal;
 import java.util.List;
 
 @RestController
@@ -20,8 +21,10 @@ public class ReviewController {
 
     // 작성
     @PostMapping
-    public ResponseEntity<Long> createReview(@RequestBody @Valid ReviewCreateRequestDto request) {
-        Long reviewId = reviewService.createReview(request);
+    public ResponseEntity<Long> createReview(
+            Principal principal,
+            @RequestBody @Valid ReviewCreateRequestDto request) {
+        Long reviewId = reviewService.createReview(request,principal.getName());
         return ResponseEntity.created(URI.create("/api/v1/reviews/" + reviewId)).body(reviewId);
     }
 
@@ -35,8 +38,8 @@ public class ReviewController {
     @DeleteMapping("/{reviewId}")
     public ResponseEntity<Void> deleteReview(
             @PathVariable Long reviewId,
-            @RequestParam Long memberId) { // 로그인 구현 전이라 param으로 받음
-        reviewService.deleteReview(reviewId, memberId);
+            Principal principal) {
+        reviewService.deleteReview(reviewId, principal.getName());
         return ResponseEntity.noContent().build();
     }
 }

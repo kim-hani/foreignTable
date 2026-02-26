@@ -8,6 +8,7 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Getter
 @MappedSuperclass
@@ -20,25 +21,26 @@ public class BaseEntity {
 
     @CreatedDate
     @Column(updatable = false)
-    private Instant createdAt;
+    private LocalDateTime createdAt;
 
     @LastModifiedDate
     @Column
-    private Instant updatedAt;
+    private LocalDateTime updatedAt;
 
-    @LastModifiedDate
     @Column
-    private Instant deletedAt;
+    private LocalDateTime deletedAt;
 
     @Column(nullable = false)
     private Boolean isDeleted = Boolean.FALSE;
 
     public Long softDelete() {
         this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
         return this.id;
     }
 
     public void restore(){
         this.isDeleted = false;
+        this.deletedAt = null;
     }
 }

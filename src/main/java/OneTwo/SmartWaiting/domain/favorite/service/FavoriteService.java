@@ -25,16 +25,16 @@ public class FavoriteService {
     private final MemberRepository memberRepository;
 
     @Transactional
-    public Long addFavorite(FavoriteRequestDto requestDto) {
-        if(favoriteRepository.existsByMemberIdAndStoreId(requestDto.memberId(), requestDto.storeId())) {
+    public Long addFavorite(FavoriteRequestDto requestDto,String email) {
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+
+        if(favoriteRepository.existsByMemberIdAndStoreId(member.getId(), requestDto.storeId())) {
             throw new IllegalStateException("이미 즐겨찾기 한 식당입니다.");
         }
 
         Store store = storeRepository.findById(requestDto.storeId())
                 .orElseThrow(() -> new IllegalArgumentException("식당을 찾을 수 없습니다."));
-
-        Member member = memberRepository.findById(requestDto.memberId())
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
 
         Favorite favorite = Favorite.builder()
                 .store(store)
@@ -45,22 +45,25 @@ public class FavoriteService {
     }
 
     @Transactional
-    public void removeFavorite(FavoriteRequestDto requestDto) {
+    public void removeFavorite(FavoriteRequestDto requestDto,String email) {
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+
         Store store = storeRepository.findById(requestDto.storeId())
                 .orElseThrow(() -> new IllegalArgumentException("식당을 찾을 수 없습니다."));
 
-        Member member = memberRepository.findById(requestDto.memberId())
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
-
-        if(!favoriteRepository.existsByMemberIdAndStoreId(requestDto.memberId(), requestDto.storeId())) {
+        if(!favoriteRepository.existsByMemberIdAndStoreId(member.getId(), requestDto.storeId())) {
             throw new IllegalStateException("즐겨찾기 내역이 존재하지 않습니다.");
         }
 
-        favoriteRepository.deleteByMemberIdAndStoreId(requestDto.memberId(), requestDto.storeId());
+        favoriteRepository.deleteByMemberIdAndStoreId(member.getId(), requestDto.storeId());
     }
 
-    public List<FavoriteResponseDto> getMyFavorites(Long memberId) {
-        return favoriteRepository.findAllByMemberId(memberId).stream()
+    public List<FavoriteResponseDto> getMyFavorites(String email) {
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+
+        return favoriteRepository.findAllByMemberId(member.getId() ).stream()
                 .map(FavoriteResponseDto::from)
                 .collect(Collectors.toList());
     }

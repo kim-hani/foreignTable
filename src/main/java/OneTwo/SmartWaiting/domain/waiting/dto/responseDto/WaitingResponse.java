@@ -15,11 +15,11 @@ public record WaitingResponse(
         String memberName,
         Integer headCount,
         WaitingStatus status,
-        Integer queueNumber,
+        Long teamsAhead,
         Integer expectedWaitMin,
         LocalDateTime createdAt
 ) {
-    public static WaitingResponse from(Waiting waiting){
+    public static WaitingResponse of(Waiting waiting,Long teamsAhead,Integer expectedWaitMin) {
         return WaitingResponse.builder()
                 .waitingId(waiting.getId())
                 .storeId(waiting.getStore().getId())
@@ -28,9 +28,9 @@ public record WaitingResponse(
                 .memberName(waiting.getMember().getNickname())
                 .headCount(waiting.getHeadCount())
                 .status(waiting.getStatus())
-                .queueNumber(waiting.getQueueNumber())
-                .expectedWaitMin(waiting.getExpectedWaitMin())
-                .createdAt(LocalDateTime.ofInstant(waiting.getCreatedAt(), java.time.ZoneId.systemDefault()))
+                .teamsAhead(teamsAhead)
+                .expectedWaitMin(expectedWaitMin)
+                .createdAt(waiting.getCreatedAt())
                 .build();
     }
 }
