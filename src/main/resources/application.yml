@@ -45,3 +45,6 @@ jwt:
 
 admin:
   secret-key: ${ADMIN_SECRET_KEY}
+
+springdoc:
+  override-with-generic-response: false

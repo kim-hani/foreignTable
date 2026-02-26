@@ -29,12 +29,6 @@ public class MemberService {
         return MemberResponseDto.from(member);
     }
 
-    // [R] 회원 단건 조회
-    public MemberResponseDto getMember(Long memberId) {
-        Member member = findMemberByIdOrThrow(memberId);
-        return MemberResponseDto.from(member); // 내부적으로 Builder 사용됨
-    }
-
     @Transactional
     public void updateMember(String email, MemberUpdateRequestDto requestDto) {
         Member member = findMemberByEmailOrThrow(email);
