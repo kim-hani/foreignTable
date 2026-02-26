@@ -26,10 +26,10 @@ public class ReviewService {
 
     // 1. 리뷰 작성
     @Transactional
-    public Long createReview(ReviewCreateRequestDto request) {
+    public Long createReview(ReviewCreateRequestDto request,String email) {
         Store store = storeRepository.findById(request.storeId()) // request.storeId() 사용!
                 .orElseThrow(() -> new IllegalArgumentException("가게가 존재하지 않습니다."));
-        Member member = memberRepository.findById(request.memberId())
+        Member member = memberRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("회원이 존재하지 않습니다."));
 
         // TODO: 나중에는 '실제 방문한 사람만' 작성 가능하도록 검증 로직 추가 필요
@@ -53,11 +53,14 @@ public class ReviewService {
 
     // 3. 리뷰 삭제 (작성자 본인 확인 필요 - 일단은 ID만 받아서 삭제)
     @Transactional
-    public void deleteReview(Long reviewId, Long memberId) {
+    public void deleteReview(Long reviewId, String email) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new IllegalArgumentException("리뷰가 존재하지 않습니다."));
 
-        if (!review.getMember().getId().equals(memberId)) {
+        Member requester = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("회원이 존재하지 않습니다."));
+
+        if (!review.getMember().getId().equals(requester.getId())) {
             throw new IllegalArgumentException("본인의 리뷰만 삭제할 수 있습니다.");
         }
 
