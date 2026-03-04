@@ -8,10 +8,14 @@ import OneTwo.SmartWaiting.domain.review.entity.Review;
 import OneTwo.SmartWaiting.domain.review.repository.ReviewRepository;
 import OneTwo.SmartWaiting.domain.store.entity.Store;
 import OneTwo.SmartWaiting.domain.store.repository.StoreRepository;
+import OneTwo.SmartWaiting.domain.waiting.entity.Waiting;
+import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
+import OneTwo.SmartWaiting.domain.waiting.repository.WaitingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -21,22 +25,38 @@ import java.util.stream.Collectors;
 public class ReviewService {
 
     private final ReviewRepository reviewRepository;
-    private final StoreRepository storeRepository;
     private final MemberRepository memberRepository;
+    private final WaitingRepository waitingRepository;
 
     // 1. 리뷰 작성
     @Transactional
-    public Long createReview(ReviewCreateRequestDto request,String email) {
-        Store store = storeRepository.findById(request.storeId()) // request.storeId() 사용!
-                .orElseThrow(() -> new IllegalArgumentException("가게가 존재하지 않습니다."));
+    public Long createReview(ReviewCreateRequestDto request, String email) {
         Member member = memberRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("회원이 존재하지 않습니다."));
 
-        // TODO: 나중에는 '실제 방문한 사람만' 작성 가능하도록 검증 로직 추가 필요
+        Waiting waiting = waitingRepository.findById(request.waitingId())
+                .orElseThrow(() -> new IllegalArgumentException("방문 기록이 존재하지 않습니다."));
+
+        if (!waiting.getMember().getId().equals(member.getId())) {
+            throw new IllegalArgumentException("본인의 방문 기록에 대해서만 리뷰를 작성할 수 있습니다.");
+        }
+
+        if (waiting.getStatus() != WaitingStatus.SEATED) {
+            throw new IllegalArgumentException("식당을 이용한 고객만 리뷰를 작성할 수 있습니다.");
+        }
+
+        if (waiting.getUpdatedAt().plusHours(48).isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("리뷰는 식당 이용 후 48시간 이내에만 작성할 수 있습니다.");
+        }
+
+        if(reviewRepository.existsByWaitingId(waiting.getId())){
+            throw new IllegalArgumentException("이미 리뷰를 작성했습니다.");
+        }
 
         Review review = Review.builder()
-                .store(store)
+                .store(waiting.getStore())
                 .member(member)
+                .waiting(waiting)
                 .content(request.content())
                 .rating(request.rating())
                 .build();
