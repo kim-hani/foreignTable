@@ -72,4 +72,13 @@ public class WaitingController {
         waitingService.changeStatus(waitingId, request, principal.getName());
         return ResponseEntity.ok().build();
     }
+
+    @Operation(summary = "웨이팅 미루기", description = "대기 손님이 자신의 웨이팅을 뒤로 미룹니다.")
+    @PatchMapping("/{waitingId}/postpone")
+    public ResponseEntity<Void> postponeWaiting(
+            @PathVariable Long waitingId,
+            Principal principal) {
+        waitingService.postponeWaiting(waitingId, principal.getName());
+        return ResponseEntity.ok().build();
+    }
 }

@@ -17,6 +17,7 @@ public record WaitingResponse(
         WaitingStatus status,
         Long teamsAhead,
         Integer expectedWaitMin,
+        Integer postponedCount,
         LocalDateTime createdAt
 ) {
     public static WaitingResponse of(Waiting waiting,Long teamsAhead,Integer expectedWaitMin) {
@@ -30,6 +31,7 @@ public record WaitingResponse(
                 .status(waiting.getStatus())
                 .teamsAhead(teamsAhead)
                 .expectedWaitMin(expectedWaitMin)
+                .postponedCount(waiting.getPostponedCount())
                 .createdAt(waiting.getCreatedAt())
                 .build();
     }
