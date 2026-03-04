@@ -6,7 +6,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 public record ReviewCreateRequestDto(
-        @NotNull Long storeId,
+
+        @NotNull(message ="방문 기록은 필수입니다.")
+        Long waitingId,
+
         @NotBlank(message = "내용을 입력해주세요.")
         String content,
 
