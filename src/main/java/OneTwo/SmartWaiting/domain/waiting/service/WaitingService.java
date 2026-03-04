@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -52,6 +53,8 @@ public class WaitingService {
                 .status(WaitingStatus.WAITING)
                 .queueNumber(myQueueNumber)
                 .expectedWaitMin(expectedWaitMin)
+                .postponedCount(0)
+                .ticketTime(LocalDateTime.now())
                 .build();
 
         return waitingRepository.save(waiting).getId();
@@ -82,7 +85,7 @@ public class WaitingService {
                     Integer expectedWaitMin = 0;
 
                     if (waiting.getStatus() == WaitingStatus.WAITING) {
-                        teamsAhead = waitingRepository.countByStoreIdAndStatusAndCreatedAtLessThan(
+                        teamsAhead = waitingRepository.countByStoreIdAndStatusAndTicketTimeLessThan(
                                 waiting.getStore().getId(),
                                 WaitingStatus.WAITING,
                                 waiting.getCreatedAt()
@@ -125,5 +128,24 @@ public class WaitingService {
             throw new IllegalArgumentException("식당 주인만 대기 상태를 변경할 수 있습니다.");
         }
         waiting.changeStatus(request.status());
+    }
+
+    @Transactional
+    public void postponeWaiting(Long waitingId,String email){
+        Waiting waiting = waitingRepository.findById(waitingId)
+                .orElseThrow(() -> new IllegalArgumentException("대기 정보를 찾을 수 없습니다."));
+
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+
+        if(!waiting.getMember().getId().equals(member.getId())) {
+            throw new IllegalArgumentException("본인의 대기 정보만 연기할 수 있습니다.");
+        }
+
+        if(waiting.getStatus() != WaitingStatus.WAITING) {
+            throw new IllegalArgumentException("대기 중인 상태만 연기할 수 있습니다.");
+        }
+
+        waiting.postpone();
     }
 }

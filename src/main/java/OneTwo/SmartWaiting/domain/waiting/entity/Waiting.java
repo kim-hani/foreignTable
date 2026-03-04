@@ -7,6 +7,8 @@ import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Getter
 @Builder
@@ -34,7 +36,22 @@ public class Waiting extends BaseEntity {
 
     private Integer expectedWaitMin;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer postponedCount = 0;
+
+    @Column(nullable = false)
+    private LocalDateTime ticketTime;
+
     public void changeStatus(WaitingStatus status) {
         this.status = status;
+    }
+
+    public void postpone(){
+        if(this.postponedCount >= 2){
+            throw new IllegalStateException("더 이상 대기 순서를 미룰 수 없습니다.");
+        }
+        this.postponedCount++;
+        this.ticketTime = LocalDateTime.now();
     }
 }
