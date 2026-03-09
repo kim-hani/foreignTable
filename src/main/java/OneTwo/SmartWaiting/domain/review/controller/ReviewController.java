@@ -7,6 +7,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -35,8 +37,10 @@ public class ReviewController {
     // 조회 (특정 가게의 리뷰)
     @Operation(summary = "가게 리뷰 전체 조회", description = "특정 식당에 달린 모든 리뷰를 최신순으로 조회합니다.")
     @GetMapping("/store/{storeId}")
-    public ResponseEntity<List<ReviewResponseDto>> getStoreReviews(@PathVariable Long storeId) {
-        return ResponseEntity.ok(reviewService.getStoreReviews(storeId));
+    public ResponseEntity<List<ReviewResponseDto>> getStoreReviews(
+            @PathVariable Long storeId,
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(reviewService.getStoreReviews(storeId,pageable));
     }
 
     // 삭제
