@@ -8,6 +8,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -68,5 +71,14 @@ public class StoreController {
             Principal principal) {
         storeService.deleteStore(storeId, principal.getName());
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "식당 검색", description = "식당 이름 혹은 카테고리로 식당 목록을 검색합니다.")
+    @GetMapping("/search")
+    public ResponseEntity<Slice<StoreResponseDto>> searchStores(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String category,
+            @PageableDefault(size = 10)Pageable pageable){
+        return ResponseEntity.ok(storeService.searchStores(name, category, pageable));
     }
 }
