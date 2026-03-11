@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.security.Principal;
-import java.util.List;
 
 @Tag(name = "5. 리뷰(Review) API", description = "식당 리뷰 작성, 조회, 삭제 기능")
 @RestController
@@ -52,5 +51,14 @@ public class ReviewController {
             Principal principal) {
         reviewService.deleteReview(reviewId, principal.getName());
         return ResponseEntity.noContent().build();
+    }
+
+    // 내 리뷰 조회
+    @Operation(summary = "내 리뷰 조회", description = "본인이 작성한 리뷰 목록을 조회합니다.")
+    @GetMapping("/my")
+    public ResponseEntity<Slice<ReviewResponseDto>> getMyReviews(
+            Principal principal,
+            @PageableDefault(size = 10) Pageable pageable){
+        return ResponseEntity.ok(reviewService.getMyReviews(principal.getName(),pageable));
     }
 }
