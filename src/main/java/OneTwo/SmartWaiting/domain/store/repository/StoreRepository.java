@@ -1,6 +1,9 @@
 package OneTwo.SmartWaiting.domain.store.repository;
 
 import OneTwo.SmartWaiting.domain.store.entity.Store;
+import OneTwo.SmartWaiting.domain.store.enums.StoreCategory;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -59,5 +62,14 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
 
     // [추가] 점주 ID로 가게 목록 조회 (나의 가게 관리용)
     List<Store> findByOwnerId(Long ownerId);
+
+    @Query("SELECT s FROM Store s WHERE " +
+            "(:name IS NULL OR s.name LIKE %:name%) AND " +
+            "(:category IS NULL OR s.category = :category)")
+    Slice<Store> searchStoresByNameAndCategory(
+            @Param("name") String name,
+            @Param("category") StoreCategory category,
+            Pageable pageable
+    );
 }
 

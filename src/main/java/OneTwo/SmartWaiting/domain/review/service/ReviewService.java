@@ -12,6 +12,8 @@ import OneTwo.SmartWaiting.domain.waiting.entity.Waiting;
 import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
 import OneTwo.SmartWaiting.domain.waiting.repository.WaitingRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,10 +67,9 @@ public class ReviewService {
     }
 
     // 2. 가게별 리뷰 조회
-    public List<ReviewResponseDto> getStoreReviews(Long storeId) {
-        return reviewRepository.findAllByStoreIdOrderByCreatedAtDesc(storeId).stream()
-                .map(ReviewResponseDto::from)
-                .collect(Collectors.toList());
+    public Slice<ReviewResponseDto> getStoreReviews(Long storeId, Pageable pageable) {
+        return reviewRepository.findAllByStoreIdOrderByCreatedAtDesc(storeId,pageable)
+                .map(ReviewResponseDto::from);
     }
 
     // 3. 리뷰 삭제 (작성자 본인 확인 필요 - 일단은 ID만 받아서 삭제)

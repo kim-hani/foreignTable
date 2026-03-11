@@ -7,11 +7,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
-import java.util.List;
 
 @Tag(name = "6. 즐겨찾기(Favorite) API", description = "식당 찜하기, 찜 해제 및 목록 조회 기능")
 @RestController
@@ -41,7 +43,9 @@ public class FavoriteController {
 
     @Operation(summary = "내 즐겨찾기 목록 조회", description = "본인이 찜한 식당 목록을 조회합니다.")
     @GetMapping("/my")
-    public ResponseEntity<List<FavoriteResponseDto>> getMyFavorites(Principal principal) {
-        return ResponseEntity.ok(favoriteService.getMyFavorites(principal.getName()));
+    public ResponseEntity<Slice<FavoriteResponseDto>> getMyFavorites(
+            Principal principal,
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(favoriteService.getMyFavorites(principal.getName(),pageable));
     }
 }

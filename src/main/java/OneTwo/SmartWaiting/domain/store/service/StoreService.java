@@ -14,6 +14,8 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -111,5 +113,12 @@ public class StoreService {
         if(!store.getOwnerId().equals(requester.getId())) {
             throw new IllegalArgumentException("해당 가게에 대한 권한이 없습니다.");
         }
+    }
+
+    public Slice<StoreResponseDto> searchStores(String name, String categoryStr, Pageable pageable){
+        StoreCategory category = (categoryStr != null && !categoryStr.isBlank()) ? StoreCategory.from(categoryStr) : null;
+
+        return storeRepository.searchStoresByNameAndCategory(name,category,pageable)
+                .map(StoreResponseDto::from);
     }
 }
