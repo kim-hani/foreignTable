@@ -5,11 +5,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.List;
-
 public interface ReviewRepository extends JpaRepository<Review, Long >{
 
     Slice<Review> findAllByStoreIdOrderByCreatedAtDesc(Long storeId, Pageable pageable);
 
     boolean existsByWaitingId(Long waitingId);
+
+    Slice<Review> findAllByMemberIdOrderByCreatedAtDesc(Long memverId,Pageable pageable);
 }

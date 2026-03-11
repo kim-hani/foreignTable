@@ -6,8 +6,6 @@ import OneTwo.SmartWaiting.domain.review.dto.requestDto.ReviewCreateRequestDto;
 import OneTwo.SmartWaiting.domain.review.dto.responseDto.ReviewResponseDto;
 import OneTwo.SmartWaiting.domain.review.entity.Review;
 import OneTwo.SmartWaiting.domain.review.repository.ReviewRepository;
-import OneTwo.SmartWaiting.domain.store.entity.Store;
-import OneTwo.SmartWaiting.domain.store.repository.StoreRepository;
 import OneTwo.SmartWaiting.domain.waiting.entity.Waiting;
 import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
 import OneTwo.SmartWaiting.domain.waiting.repository.WaitingRepository;
@@ -18,8 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -86,5 +82,14 @@ public class ReviewService {
         }
 
         reviewRepository.delete(review);
+    }
+
+    // 4. 내 리뷰 목록 조회
+    public Slice<ReviewResponseDto> getMyReviews(String email,Pageable pageable) {
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("회원이 존재하지 않습니다."));
+
+        return reviewRepository.findAllByMemberIdOrderByCreatedAtDesc(member.getId(),pageable)
+                .map(ReviewResponseDto::from);
     }
 }
