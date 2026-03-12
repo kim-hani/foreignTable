@@ -39,7 +39,7 @@ public class AuthService {
         validation(requestDto.email(),requestDto.loginId());
 
         if(!requestDto.password().equals(requestDto.passwordCheck())) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+            throw new BusinessException(ErrorCode.PASSWORD_MISMATCH);
         }
 
         Member member = Member.builder()
@@ -67,7 +67,7 @@ public class AuthService {
         validation(requestDto.email(),requestDto.loginId());
 
         if(!requestDto.password().equals(requestDto.passwordCheck())) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+            throw new BusinessException(ErrorCode.PASSWORD_MISMATCH);
         }
 
         Member owner = Member.builder()

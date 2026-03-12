@@ -18,6 +18,8 @@ public enum ErrorCode {
     INVALID_IDPASSWORD(HttpStatus.UNAUTHORIZED, "A003", "아이디 또는 비밀번호가 일치하지 않습니다."),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "A004", "유효하지 않거나 만료된 토큰입니다."),
     INVALID_ADMIN_KEY(HttpStatus.UNAUTHORIZED, "A005", "잘못된 관리자 인증 키입니다."),
+    PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "A006", "비밀번호가 일치하지 않습니다."),
+    INVALID_PASSWORD_VALUE(HttpStatus.BAD_REQUEST, "A007", "비밀번호는 8자 이상이어야 하며, 영문 대소문자, 숫자, 특수문자를 포함해야 합니다."),
 
     // ===== 회원 (Member) =====
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "M001", "회원 정보를 찾을 수 없습니다."),
