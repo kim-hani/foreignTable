@@ -1,5 +1,7 @@
 package OneTwo.SmartWaiting.config;
 
+import OneTwo.SmartWaiting.common.exception.JwtAccessDeniedHandler;
+import OneTwo.SmartWaiting.common.exception.JwtAuthenticationEntryPoint;
 import OneTwo.SmartWaiting.domain.oauth.CustomOAuth2UserService;
 import OneTwo.SmartWaiting.domain.oauth.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +54,10 @@ public class SecurityConfig {
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService)) // 로그인 로직 연결
                         .successHandler(oAuth2SuccessHandler) // 로그인 성공 시 핸들러 연결
+                )
+                .exceptionHandling(exceptionHandling -> exceptionHandling
+                        .authenticationEntryPoint(new JwtAuthenticationEntryPoint()) // 401 (토큰 없음/만료) 처리
+                        .accessDeniedHandler(new JwtAccessDeniedHandler())           // 403 (권한 없음) 처리
                 )
                 // JWT 인증 필터를 UsernamePasswordAuthenticationFilter 앞에 추가
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class);

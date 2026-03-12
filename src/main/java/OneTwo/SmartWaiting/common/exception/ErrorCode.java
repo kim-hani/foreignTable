@@ -15,7 +15,7 @@ public enum ErrorCode {
     // ===== 인증 및 권한 (Auth & Security) =====
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "A001", "로그인이 필요합니다."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "A002", "해당 기능을 사용할 권한이 없습니다."),
-    INVALID_PASSWORD(HttpStatus.UNAUTHORIZED, "A003", "아이디 또는 비밀번호가 일치하지 않습니다."),
+    INVALID_IDPASSWORD(HttpStatus.UNAUTHORIZED, "A003", "아이디 또는 비밀번호가 일치하지 않습니다."),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "A004", "유효하지 않거나 만료된 토큰입니다."),
     INVALID_ADMIN_KEY(HttpStatus.UNAUTHORIZED, "A005", "잘못된 관리자 인증 키입니다."),
 

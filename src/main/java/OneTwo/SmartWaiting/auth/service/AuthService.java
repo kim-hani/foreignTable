@@ -8,6 +8,8 @@ import OneTwo.SmartWaiting.auth.dto.responseDto.SignInResponseDto;
 import OneTwo.SmartWaiting.auth.dto.responseDto.SignUpResponseDto;
 import OneTwo.SmartWaiting.auth.entity.RefreshToken;
 import OneTwo.SmartWaiting.auth.repository.RefreshTokenRepository;
+import OneTwo.SmartWaiting.common.exception.BusinessException;
+import OneTwo.SmartWaiting.common.exception.ErrorCode;
 import OneTwo.SmartWaiting.config.JwtTokenProvider;
 import OneTwo.SmartWaiting.domain.member.entity.Member;
 import OneTwo.SmartWaiting.domain.member.enums.UserRole;
@@ -37,7 +39,7 @@ public class AuthService {
         validation(requestDto.email(),requestDto.loginId());
 
         if(!requestDto.password().equals(requestDto.passwordCheck())) {
-            throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
         Member member = Member.builder()
@@ -59,15 +61,13 @@ public class AuthService {
        return createTokenResponse(member);
     }
 
-
-
     // ===== 사장님 회원가입 ======
     @Transactional
     public SignInResponseDto signupOwner(SignUpRequestDto requestDto) {
         validation(requestDto.email(),requestDto.loginId());
 
         if(!requestDto.password().equals(requestDto.passwordCheck())) {
-            throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
         Member owner = Member.builder()
@@ -88,7 +88,7 @@ public class AuthService {
         validation(requestDto.email(),requestDto.loginId());
 
         if(!requestDto.adminKey().equals(adminSecretKey)) {
-            throw new IllegalArgumentException("잘못된 관리자 인증 키입니다.");
+            throw new BusinessException(ErrorCode.INVALID_ADMIN_KEY);
         }
 
         Member admin = Member.builder()
@@ -108,7 +108,7 @@ public class AuthService {
         Member admin = validateMember(requestDto.loginId(), requestDto.password());
 
         if(admin.getRole() != UserRole.ADMIN ) {
-            throw new IllegalArgumentException("관리자 권한이 없습니다.");
+            throw new BusinessException(ErrorCode.ACCESS_DENIED);
         }
 
         return createTokenResponse(admin);
@@ -118,7 +118,7 @@ public class AuthService {
     @Transactional
     public void logout(String email){
         Member member = memberRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
         refreshTokenRepository.deleteById(String.valueOf(member.getId()));
     }
@@ -126,17 +126,17 @@ public class AuthService {
     // ====== 공통 로직 ======
     private void validation(String email, String loginId) {
         if (memberRepository.existsByEmail(email))
-            throw new IllegalArgumentException("이미 가입된 이메일입니다.");
+            throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
         if (memberRepository.findByLoginId(loginId).isPresent())
-            throw new IllegalArgumentException("이미 존재하는 아이디입니다.");
+            throw new BusinessException(ErrorCode.LOGIN_ID_ALREADY_EXISTS);
     }
 
     private Member validateMember(String loginId, String password) {
         Member member = memberRepository.findByLoginId(loginId)
-                .orElseThrow(() -> new IllegalArgumentException("아이디 또는 비밀번호가 일치하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_IDPASSWORD));
 
         if (!passwordEncoder.matches(password, member.getPassword())) {
-            throw new IllegalArgumentException("아이디 또는 비밀번호가 일치하지 않습니다.");
+            throw new BusinessException(ErrorCode.INVALID_IDPASSWORD);
         }
 
         return member;
@@ -161,20 +161,20 @@ public class AuthService {
     public SignInResponseDto reissueToken(ReissueRequestDto requestDto) {
         // 1. Refresh Token이 유효한지(만료되지 않았는지, 위조되지 않았는지) 검증
         if (!jwtTokenProvider.validateToken(requestDto.refreshToken())) {
-            throw new IllegalArgumentException("Refresh Token이 유효하지 않거나 만료되었습니다. 다시 로그인해주세요.");
+            throw new BusinessException(ErrorCode.INVALID_TOKEN);
         }
 
         // 2. DB에서 넘어온 Refresh Token 값으로 저장된 토큰 엔티티 찾기
         RefreshToken savedToken = refreshTokenRepository.findByValue(requestDto.refreshToken())
-                .orElseThrow(() -> new IllegalArgumentException("서버에 존재하지 않는 Refresh Token입니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
 
         // 3. 찾은 토큰 엔티티의 ID(memberId)로 회원 정보 조회
         Long memberId = Long.parseLong(savedToken.getKey());
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
         if(member.getIsDeleted() == Boolean.TRUE){
-            throw new IllegalArgumentException("존재하지 않는 회원입니다.");
+            throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
         }
 
         // 4. 새로운 Access Token 및 Refresh Token 발급 (기존 createTokenResponse 재활용!)
