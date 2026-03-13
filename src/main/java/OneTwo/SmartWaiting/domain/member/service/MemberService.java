@@ -1,6 +1,8 @@
 package OneTwo.SmartWaiting.domain.member.service;
 
 import OneTwo.SmartWaiting.auth.repository.RefreshTokenRepository;
+import OneTwo.SmartWaiting.common.exception.BusinessException;
+import OneTwo.SmartWaiting.common.exception.ErrorCode;
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.MemberSignUpRequestDto;
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.MemberUpdateRequestDto;
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.PasswordUpdateRequestDto;
@@ -49,13 +51,13 @@ public class MemberService {
     @Transactional
     public void updatePassword(String email, PasswordUpdateRequestDto requestDto) {
         if (!requestDto.newPassword().equals(requestDto.newPasswordCheck())) {
-            throw new IllegalArgumentException("새 비밀번호가 일치하지 않습니다.");
+            throw new BusinessException(ErrorCode.PASSWORD_MISMATCH);
         }
 
         Member member = findMemberByEmailOrThrow(email);
 
         if (!passwordEncoder.matches(requestDto.currentPassword(), member.getPassword())) {
-            throw new IllegalArgumentException("현재 비밀번호가 일치하지 않습니다.");
+            throw new BusinessException(ErrorCode.PASSWORD_MISMATCH);
         }
 
         member.updatePassword(passwordEncoder.encode(requestDto.newPassword()));
@@ -63,15 +65,15 @@ public class MemberService {
 
     private Member findMemberByIdOrThrow(Long memberId) {
         return memberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다. ID=" + memberId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
     }
 
     private Member findMemberByEmailOrThrow(String email) {
         Member member = memberRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다. Email=" + email));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
         if(member.getIsDeleted() == Boolean.TRUE) {
-            throw new IllegalArgumentException("삭제된 회원입니다. Email=" + email);
+            throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
         }
         return member;
     }

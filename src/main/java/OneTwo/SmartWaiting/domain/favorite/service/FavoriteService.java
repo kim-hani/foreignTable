@@ -1,5 +1,7 @@
 package OneTwo.SmartWaiting.domain.favorite.service;
 
+import OneTwo.SmartWaiting.common.exception.BusinessException;
+import OneTwo.SmartWaiting.common.exception.ErrorCode;
 import OneTwo.SmartWaiting.domain.favorite.dto.requestDto.FavoriteRequestDto;
 import OneTwo.SmartWaiting.domain.favorite.dto.responseDto.FavoriteResponseDto;
 import OneTwo.SmartWaiting.domain.favorite.entity.Favorite;
@@ -26,14 +28,14 @@ public class FavoriteService {
     @Transactional
     public Long addFavorite(FavoriteRequestDto requestDto, String email) {
         Member member = memberRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
         if (favoriteRepository.existsByMemberIdAndStoreId(member.getId(), requestDto.storeId())) {
-            throw new IllegalStateException("이미 즐겨찾기 한 식당입니다.");
+            throw new BusinessException(ErrorCode.ALREADY_FAVORITE);
         }
 
         Store store = storeRepository.findById(requestDto.storeId())
-                .orElseThrow(() -> new IllegalArgumentException("식당을 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
 
         Favorite favorite = Favorite.builder()
                 .store(store)
@@ -46,13 +48,13 @@ public class FavoriteService {
     @Transactional
     public void removeFavorite(FavoriteRequestDto requestDto, String email) {
         Member member = memberRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
         Store store = storeRepository.findById(requestDto.storeId())
-                .orElseThrow(() -> new IllegalArgumentException("식당을 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
 
         if (!favoriteRepository.existsByMemberIdAndStoreId(member.getId(), store.getId())) {
-            throw new IllegalStateException("즐겨찾기 내역이 존재하지 않습니다.");
+            throw new BusinessException(ErrorCode.FAVORITE_NOT_FOUND);
         }
 
         favoriteRepository.deleteByMemberIdAndStoreId(member.getId(), requestDto.storeId());
@@ -60,7 +62,7 @@ public class FavoriteService {
 
     public Slice<FavoriteResponseDto> getMyFavorites(String email, Pageable pageable) {
         Member member = memberRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
         return favoriteRepository.findAllByMemberId(member.getId(),pageable)
                 .map(FavoriteResponseDto::from);
