@@ -1,5 +1,7 @@
 package OneTwo.SmartWaiting.domain.review.service;
 
+import OneTwo.SmartWaiting.common.exception.BusinessException;
+import OneTwo.SmartWaiting.common.exception.ErrorCode;
 import OneTwo.SmartWaiting.domain.member.entity.Member;
 import OneTwo.SmartWaiting.domain.member.repository.MemberRepository;
 import OneTwo.SmartWaiting.domain.review.dto.requestDto.ReviewCreateRequestDto;
@@ -30,25 +32,25 @@ public class ReviewService {
     @Transactional
     public Long createReview(ReviewCreateRequestDto request, String email) {
         Member member = memberRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("회원이 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
         Waiting waiting = waitingRepository.findById(request.waitingId())
-                .orElseThrow(() -> new IllegalArgumentException("방문 기록이 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.WAITING_NOT_FOUND));
 
         if (!waiting.getMember().getId().equals(member.getId())) {
-            throw new IllegalArgumentException("본인의 방문 기록에 대해서만 리뷰를 작성할 수 있습니다.");
+            throw new BusinessException(ErrorCode.NOT_YOUR_WAITING);
         }
 
         if (waiting.getStatus() != WaitingStatus.SEATED) {
-            throw new IllegalArgumentException("식당을 이용한 고객만 리뷰를 작성할 수 있습니다.");
+            throw new BusinessException(ErrorCode.REVIEW_UNAUTHORIZED_VISIT);
         }
 
         if (waiting.getUpdatedAt().plusHours(48).isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("리뷰는 식당 이용 후 48시간 이내에만 작성할 수 있습니다.");
+            throw new BusinessException(ErrorCode.REVIEW_TIME_EXPIRED);
         }
 
         if(reviewRepository.existsByWaitingId(waiting.getId())){
-            throw new IllegalArgumentException("이미 리뷰를 작성했습니다.");
+            throw new BusinessException(ErrorCode.REVIEW_ALREADY_EXISTS);
         }
 
         Review review = Review.builder()
@@ -72,13 +74,13 @@ public class ReviewService {
     @Transactional
     public void deleteReview(Long reviewId, String email) {
         Review review = reviewRepository.findById(reviewId)
-                .orElseThrow(() -> new IllegalArgumentException("리뷰가 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
 
         Member requester = memberRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("회원이 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
         if (!review.getMember().getId().equals(requester.getId())) {
-            throw new IllegalArgumentException("본인의 리뷰만 삭제할 수 있습니다.");
+            throw new BusinessException(ErrorCode.NOT_YOUR_REVIEW);
         }
 
         reviewRepository.delete(review);
@@ -87,7 +89,7 @@ public class ReviewService {
     // 4. 내 리뷰 목록 조회
     public Slice<ReviewResponseDto> getMyReviews(String email,Pageable pageable) {
         Member member = memberRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("회원이 존재하지 않습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
         return reviewRepository.findAllByMemberIdOrderByCreatedAtDesc(member.getId(),pageable)
                 .map(ReviewResponseDto::from);

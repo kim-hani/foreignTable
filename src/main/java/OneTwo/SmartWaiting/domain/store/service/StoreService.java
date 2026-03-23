@@ -1,5 +1,7 @@
 package OneTwo.SmartWaiting.domain.store.service;
 
+import OneTwo.SmartWaiting.common.exception.BusinessException;
+import OneTwo.SmartWaiting.common.exception.ErrorCode;
 import OneTwo.SmartWaiting.domain.member.entity.Member;
 import OneTwo.SmartWaiting.domain.member.enums.UserRole;
 import OneTwo.SmartWaiting.domain.member.repository.MemberRepository;
@@ -36,10 +38,10 @@ public class StoreService {
     public Long createStore(StoreCreateRequestDto request,String email) {
 
         Member member = memberRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
         if(member.getRole() != UserRole.OWNER) {
-            throw new IllegalArgumentException("식당 등록 권한이 없습니다.");
+            throw new BusinessException(ErrorCode.ACCESS_DENIED);
         }
 
         Point location = geometryFactory.createPoint(new Coordinate(request.longitude(), request.latitude()));
@@ -61,7 +63,7 @@ public class StoreService {
     // 식당 단건 조회
     public StoreResponseDto getStore(Long storeId) {
         Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new IllegalArgumentException("식당을 찾을 수 없습니다. ID=" + storeId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
 
         return StoreResponseDto.from(store);
     }
@@ -103,15 +105,15 @@ public class StoreService {
 
     private Store findStoreOrThrow(Long storeId) {
         return storeRepository.findById(storeId)
-                .orElseThrow(() -> new IllegalArgumentException("식당을 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
     }
 
     private void validateOwner(Store store, String email) {
         Member requester = memberRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
         if(!store.getOwnerId().equals(requester.getId())) {
-            throw new IllegalArgumentException("해당 가게에 대한 권한이 없습니다.");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED_STORE_OWNER);
         }
     }
 
