@@ -2,6 +2,11 @@ spring:
   application:
     name: SmartWaiting
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
   datasource:
     url: jdbc:postgresql://localhost:5433/smartwaiting
     username: ${DB_USERNAME}
@@ -39,7 +44,7 @@ logging:
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
 
 jwt:
-  secret: ${JWT_SECRET}  # 변수로 변경
+  secret: ${JWT_SECRET}
   expiration: 86400000
   refresh-expiration: 604800000
 

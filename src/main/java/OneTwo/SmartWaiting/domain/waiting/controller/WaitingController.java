@@ -4,6 +4,7 @@ import OneTwo.SmartWaiting.domain.waiting.dto.requestDto.WaitingChangeRequestDto
 import OneTwo.SmartWaiting.domain.waiting.dto.requestDto.WaitingRegisterRequestDto;
 import OneTwo.SmartWaiting.domain.waiting.dto.responseDto.WaitingResponse;
 import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
+import OneTwo.SmartWaiting.domain.waiting.facade.WaitingLockFacade;
 import OneTwo.SmartWaiting.domain.waiting.service.WaitingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,6 +23,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class WaitingController {
 
+    private final WaitingLockFacade waitingLockFacade;
     private final WaitingService waitingService;
 
     // 대기 등록
@@ -30,7 +32,8 @@ public class WaitingController {
     public ResponseEntity<Long> registerWaiting(
             Principal principal,
             @RequestBody @Valid WaitingRegisterRequestDto request) {
-        Long waitingId = waitingService.registerWaiting(request,principal.getName());
+
+        Long waitingId = waitingLockFacade.registerWaiting(request, principal.getName());
         return ResponseEntity.created(URI.create("/api/v1/waitings/" + waitingId)).body(waitingId);
     }
 
