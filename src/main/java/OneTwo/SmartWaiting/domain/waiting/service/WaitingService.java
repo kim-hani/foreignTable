@@ -38,9 +38,9 @@ public class WaitingService {
         Member member = memberRepository.findByEmail(email)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
-        if(waitingRepository.existsByMemberIdAndStoreIdAndStatus(member.getId(), store.getId(), WaitingStatus.WAITING)) {
-            throw new BusinessException(ErrorCode.WAITING_ALREADY_EXISTS);
-        }
+//        if(waitingRepository.existsByMemberIdAndStoreIdAndStatus(member.getId(), store.getId(), WaitingStatus.WAITING)) {
+//            throw new BusinessException(ErrorCode.WAITING_ALREADY_EXISTS);
+//        }
 
         long currentWaitingCount = waitingRepository.countByStoreIdAndStatus(store.getId(), WaitingStatus.WAITING);
 
