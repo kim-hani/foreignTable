@@ -11,7 +11,6 @@ import OneTwo.SmartWaiting.domain.store.dto.responseDto.StoreResponseDto;
 import OneTwo.SmartWaiting.domain.store.entity.Store;
 import OneTwo.SmartWaiting.domain.store.enums.StoreCategory;
 import OneTwo.SmartWaiting.domain.store.repository.StoreRepository;
-import OneTwo.SmartWaiting.domain.store.entity.MenuItemVo;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,12 +23,11 @@ import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,9 +48,13 @@ class StoreServiceTest {
         // given
         String email = "owner@gmail.com";
         StoreCreateRequestDto requestDto = createDefaultCreateRequestDto();
-        Member mockOwner = createMockOwner(1L);
+
+        Member mockOwner = mock(Member.class);
+        when(mockOwner.getId()).thenReturn(1L);
+        when(mockOwner.getRole()).thenReturn(UserRole.OWNER);
+
         Store mockStore = mock(Store.class);
-        when(mockStore.getId()).thenReturn(10L);
+        lenient().when(mockStore.getId()).thenReturn(10L);
 
         when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockOwner));
         when(storeRepository.save(any(Store.class))).thenReturn(mockStore);
@@ -75,9 +77,9 @@ class StoreServiceTest {
         when(memberRepository.findByEmail(email)).thenReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> storeService.createStore(requestDto, email))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MEMBER_NOT_FOUND);
+        BusinessException exception = assertThrows(BusinessException.class, () -> storeService.createStore(requestDto, email));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.MEMBER_NOT_FOUND);
     }
 
     @Test
@@ -86,14 +88,16 @@ class StoreServiceTest {
         // given
         String email = "user@gmail.com";
         StoreCreateRequestDto requestDto = createDefaultCreateRequestDto();
-        Member mockUser = createMockUser(1L);
+
+        Member mockUser = mock(Member.class);
+        when(mockUser.getRole()).thenReturn(UserRole.USER);
 
         when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockUser));
 
         // when & then
-        assertThatThrownBy(() -> storeService.createStore(requestDto, email))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ACCESS_DENIED);
+        BusinessException exception = assertThrows(BusinessException.class, () -> storeService.createStore(requestDto, email));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED);
     }
 
     @Test
@@ -101,7 +105,20 @@ class StoreServiceTest {
     void getStore_Success() {
         // given
         Long storeId = 1L;
-        Store mockStore = createMockStore(storeId, 1L, "테스트 식당", StoreCategory.KOREAN, 10, "010-1234-5678", 37.5665, 126.9780);
+        Store mockStore = mock(Store.class);
+
+        lenient().when(mockStore.getId()).thenReturn(storeId);
+        lenient().when(mockStore.getName()).thenReturn("테스트 식당");
+        lenient().when(mockStore.getCategory()).thenReturn(StoreCategory.KOREAN);
+        lenient().when(mockStore.getAverageWaiting()).thenReturn(10);
+        lenient().when(mockStore.getPhone()).thenReturn("010-1234-5678");
+        lenient().when(mockStore.getBusinessHours()).thenReturn(Map.of("월", "09:00-21:00"));
+        lenient().when(mockStore.getMenuItems()).thenReturn(Collections.emptyList());
+
+        GeometryFactory gf = new GeometryFactory(new PrecisionModel(), 4326);
+        Point mockPoint = gf.createPoint(new Coordinate(126.9780, 37.5665));
+        lenient().when(mockStore.getLocation()).thenReturn(mockPoint);
+
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
 
         // when
@@ -121,9 +138,9 @@ class StoreServiceTest {
         when(storeRepository.findById(storeId)).thenReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> storeService.getStore(storeId))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.STORE_NOT_FOUND);
+        BusinessException exception = assertThrows(BusinessException.class, () -> storeService.getStore(storeId));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.STORE_NOT_FOUND);
     }
 
     @Test
@@ -135,9 +152,10 @@ class StoreServiceTest {
         StoreUpdateRequestDto requestDto = createDefaultUpdateRequestDto("수정된 식당", "010-9876-5432", "JAPANESE", 15, 37.5000, 127.0000);
 
         Store mockStore = mock(Store.class);
-        when(mockStore.getOwnerId()).thenReturn(1L);
+        lenient().when(mockStore.getOwnerId()).thenReturn(1L);
 
-        Member mockOwner = createMockOwner(1L);
+        Member mockOwner = mock(Member.class);
+        when(mockOwner.getId()).thenReturn(1L);
 
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
         when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockOwner));
@@ -168,9 +186,9 @@ class StoreServiceTest {
         when(storeRepository.findById(storeId)).thenReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> storeService.updateStore(storeId, email, requestDto))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.STORE_NOT_FOUND);
+        BusinessException exception = assertThrows(BusinessException.class, () -> storeService.updateStore(storeId, email, requestDto));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.STORE_NOT_FOUND);
     }
 
     @Test
@@ -182,17 +200,18 @@ class StoreServiceTest {
         StoreUpdateRequestDto requestDto = createDefaultUpdateRequestDto();
 
         Store mockStore = mock(Store.class);
-        when(mockStore.getOwnerId()).thenReturn(1L); // Store belongs to owner 1
+        lenient().when(mockStore.getOwnerId()).thenReturn(1L); // 소유자는 1번
 
-        Member mockHacker = createMockHacker(2L); // Hacker member ID 2
+        Member mockHacker = mock(Member.class);
+        when(mockHacker.getId()).thenReturn(2L); // 해커는 2번
 
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
         when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockHacker));
 
         // when & then
-        assertThatThrownBy(() -> storeService.updateStore(storeId, email, requestDto))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UNAUTHORIZED_STORE_OWNER);
+        BusinessException exception = assertThrows(BusinessException.class, () -> storeService.updateStore(storeId, email, requestDto));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.UNAUTHORIZED_STORE_OWNER);
     }
 
     @Test
@@ -203,9 +222,10 @@ class StoreServiceTest {
         String email = "owner@gmail.com";
 
         Store mockStore = mock(Store.class);
-        when(mockStore.getOwnerId()).thenReturn(1L);
+        lenient().when(mockStore.getOwnerId()).thenReturn(1L);
 
-        Member mockOwner = createMockOwner(1L);
+        Member mockOwner = mock(Member.class);
+        when(mockOwner.getId()).thenReturn(1L);
 
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
         when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockOwner));
@@ -227,9 +247,9 @@ class StoreServiceTest {
         when(storeRepository.findById(storeId)).thenReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> storeService.deleteStore(storeId, email))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.STORE_NOT_FOUND);
+        BusinessException exception = assertThrows(BusinessException.class, () -> storeService.deleteStore(storeId, email));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.STORE_NOT_FOUND);
     }
 
     @Test
@@ -240,18 +260,21 @@ class StoreServiceTest {
         String email = "hacker@gmail.com";
 
         Store mockStore = mock(Store.class);
-        when(mockStore.getOwnerId()).thenReturn(1L); // Store belongs to owner 1
+        when(mockStore.getOwnerId()).thenReturn(1L); // 소유자는 1번
 
-        Member mockHacker = createMockHacker(2L); // Hacker member ID 2
+        Member mockHacker = mock(Member.class);
+        when(mockHacker.getId()).thenReturn(2L); // 해커는 2번
 
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
         when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockHacker));
 
         // when & then
-        assertThatThrownBy(() -> storeService.deleteStore(storeId, email))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UNAUTHORIZED_STORE_OWNER);
+        BusinessException exception = assertThrows(BusinessException.class, () -> storeService.deleteStore(storeId, email));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.UNAUTHORIZED_STORE_OWNER);
     }
+
+    // ================= [ Helper Methods ] =================
 
     private StoreCreateRequestDto createDefaultCreateRequestDto() {
         return new StoreCreateRequestDto(
@@ -281,42 +304,5 @@ class StoreServiceTest {
                 Map.of("화", "10:00-22:00"),
                 Collections.emptyList()
         );
-    }
-
-    private Member createMockOwner(Long id) {
-        Member mockOwner = mock(Member.class);
-        when(mockOwner.getId()).thenReturn(id);
-        when(mockOwner.getRole()).thenReturn(UserRole.OWNER);
-        return mockOwner;
-    }
-
-    private Member createMockUser(Long id) {
-        Member mockUser = mock(Member.class);
-        when(mockUser.getId()).thenReturn(id);
-        when(mockUser.getRole()).thenReturn(UserRole.USER);
-        return mockUser;
-    }
-
-    private Member createMockHacker(Long id) {
-        Member mockHacker = mock(Member.class);
-        when(mockHacker.getId()).thenReturn(id);
-        return mockHacker;
-    }
-
-    private Store createMockStore(Long id, Long ownerId, String name, StoreCategory category, Integer averageWaiting, String phone, double latitude, double longitude) {
-        Store mockStore = mock(Store.class);
-        when(mockStore.getId()).thenReturn(id);
-        when(mockStore.getOwnerId()).thenReturn(ownerId);
-        when(mockStore.getName()).thenReturn(name);
-        when(mockStore.getCategory()).thenReturn(category);
-        when(mockStore.getAverageWaiting()).thenReturn(averageWaiting);
-        when(mockStore.getPhone()).thenReturn(phone);
-        when(mockStore.getBusinessHours()).thenReturn("09:00-21:00"); // 기본값 설정
-        when(mockStore.getMenuItems()).thenReturn(Collections.emptyList()); // 기본값 설정
-
-        GeometryFactory gf = new GeometryFactory(new PrecisionModel(), 4326);
-        Point mockPoint = gf.createPoint(new Coordinate(longitude, latitude));
-        when(mockStore.getLocation()).thenReturn(mockPoint);
-        return mockStore;
     }
 }
