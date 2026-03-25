@@ -31,7 +31,6 @@ public class StoreService {
 
     private final MemberRepository memberRepository;
     private final StoreRepository storeRepository;
-    private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
     // 식당 생성
     @Transactional
@@ -44,6 +43,7 @@ public class StoreService {
             throw new BusinessException(ErrorCode.ACCESS_DENIED);
         }
 
+        GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
         Point location = geometryFactory.createPoint(new Coordinate(request.longitude(), request.latitude()));
 
         Store store = Store.builder()
@@ -82,6 +82,7 @@ public class StoreService {
         validateOwner(store, email);
 
         // 수정된 위경도를 바탕으로 다시 Point 객체 생성
+        GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
         Point updatedLocation = geometryFactory.createPoint(new Coordinate(request.longitude(), request.latitude()));
 
         store.updateInfo(
