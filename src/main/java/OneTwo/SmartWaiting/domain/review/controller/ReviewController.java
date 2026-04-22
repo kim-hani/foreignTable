@@ -2,6 +2,7 @@ package OneTwo.SmartWaiting.domain.review.controller;
 
 import OneTwo.SmartWaiting.domain.review.dto.requestDto.ReviewCreateRequestDto;
 import OneTwo.SmartWaiting.domain.review.dto.responseDto.ReviewResponseDto;
+import OneTwo.SmartWaiting.domain.review.service.AIReviewService;
 import OneTwo.SmartWaiting.domain.review.service.ReviewService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +24,7 @@ import java.security.Principal;
 public class ReviewController {
 
     private final ReviewService reviewService;
+    private final AIReviewService aiReviewService;
 
     // 작성
     @Operation(summary = "리뷰 작성", description = "특정 식당에 대한 리뷰와 별점을 등록합니다.")
@@ -60,5 +62,13 @@ public class ReviewController {
             Principal principal,
             @PageableDefault(size = 10) Pageable pageable){
         return ResponseEntity.ok(reviewService.getMyReviews(principal.getName(),pageable));
+    }
+
+    // 리뷰 요약
+    @GetMapping("/summary/{storeId}")
+    @Operation(summary = "식당 리뷰 AI 3줄 요약 조회")
+    public ResponseEntity<String> getAIReviewSummary(@PathVariable("storeId") Long storeId) {
+        String summary = aiReviewService.getAIReviewSummary(storeId);
+        return ResponseEntity.ok(summary);
     }
 }

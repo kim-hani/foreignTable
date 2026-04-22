@@ -38,6 +38,14 @@ spring:
     serialization:
       fail-on-empty-beans: false
 
+  ai:
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY}
+        chat:
+          options:
+            model: gemini-2.5-flash
+
 logging:
   level:
     org.hibernate.SQL: DEBUG

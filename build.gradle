@@ -24,12 +24,13 @@ configurations {
 
 repositories {
 	mavenCentral()
+	maven { url 'https://repo.spring.io/milestone' }
 }
 
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
-	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.hibernate.orm:hibernate-spatial'
 	implementation 'net.postgis:postgis-jdbc:2.5.0'
@@ -41,6 +42,10 @@ dependencies {
 	// redis
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 	implementation 'org.redisson:redisson:3.27.0'
+
+    // spring AI
+	implementation platform("org.springframework.ai:spring-ai-bom:2.0.0-M4")
+	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
 
 	compileOnly 'org.projectlombok:lombok'
 
