@@ -64,9 +64,10 @@ public class ReviewController {
         return ResponseEntity.ok(reviewService.getMyReviews(principal.getName(),pageable));
     }
 
-    @GetMapping("/summary")
-    @Operation(summary = "식당 리뷰 AI 3줄 요약 조회", description = "최근 50개의 리뷰를 AI가 3줄로 요약하여 반환합니다.")
-    public ResponseEntity<String> getAIReviewSummary(@PathVariable Long storeId) {
+    // 리뷰 요약
+    @GetMapping("/summary/{storeId}")
+    @Operation(summary = "식당 리뷰 AI 3줄 요약 조회")
+    public ResponseEntity<String> getAIReviewSummary(@PathVariable("storeId") Long storeId) {
         String summary = aiReviewService.getAIReviewSummary(storeId);
         return ResponseEntity.ok(summary);
     }

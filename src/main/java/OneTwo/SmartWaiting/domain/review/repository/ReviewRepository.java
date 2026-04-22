@@ -16,4 +16,6 @@ public interface ReviewRepository extends JpaRepository<Review, Long >{
     Slice<Review> findAllByMemberIdOrderByCreatedAtDesc(Long memverId,Pageable pageable);
 
     List<Review> findTop50ByStoreIdOrderByCreatedAtDesc(Long storeId);
+
+    long countByStoreId(Long storeId);
 }

@@ -39,12 +39,12 @@ spring:
       fail-on-empty-beans: false
 
   ai:
-    openai:
-      api-key: ${GEMINI_API_KEY}
-      base-url: https://generativelanguage.googleapis.com/v1beta/openai/
-      chat:
-        options:
-          model: gemini-1.5-flash
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY}
+        chat:
+          options:
+            model: gemini-2.5-flash
 
 logging:
   level:
