@@ -2,6 +2,8 @@ package OneTwo.SmartWaiting.domain.waiting.repository;
 
 import OneTwo.SmartWaiting.domain.waiting.entity.Waiting;
 import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -22,4 +24,8 @@ public interface WaitingRepository extends JpaRepository<Waiting, Long> {
     boolean existsByMemberIdAndStoreIdAndStatus(Long memberId, Long storeId, WaitingStatus status);
 
     Long countByStoreIdAndStatusAndTicketTimeLessThan(Long storeId, WaitingStatus status, LocalDateTime createdAt);
+
+    Page<Waiting> findByStoreIdAndStatusOrderByTicketTimeAsc(Long storeId, WaitingStatus status, Pageable pageable);
+
+    List<Waiting> findAllByStatusAndUpdatedAtBetween(WaitingStatus status, LocalDateTime start, LocalDateTime end);
 }

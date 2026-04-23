@@ -21,7 +21,7 @@ public class Member extends BaseEntity {
     @Column(nullable = false)
     private String nickname;
 
-    @Enumerated(EnumType.STRING) // [중요] Enum 이름을 문자열로 저장 (ROLE_USER)
+    @Enumerated(EnumType.STRING) // Enum 이름을 문자열로 저장 (ROLE_USER)
     @Column(nullable = false)
     private UserRole role;
 
@@ -31,6 +31,9 @@ public class Member extends BaseEntity {
     private String password;
 
     private String provider;
+
+    @Column(name = "fcm_token")
+    private String fcmToken;
 
     public void updateNickname(String nickname) {
         this.nickname = nickname;
@@ -47,5 +50,9 @@ public class Member extends BaseEntity {
         if(this.loginId != null){
             this.loginId = "deleted_" + System.currentTimeMillis() + "_" + this.loginId;
         }
+    }
+
+    public void updateFcmToken(String fcmToken){
+        this.fcmToken = fcmToken;
     }
 }
