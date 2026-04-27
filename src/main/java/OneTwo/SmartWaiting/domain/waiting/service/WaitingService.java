@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -46,7 +47,8 @@ public class WaitingService {
             throw new BusinessException(ErrorCode.WAITING_ALREADY_EXISTS);
         }
 
-        long currentWaitingCount = waitingRepository.countByStoreIdAndStatus(store.getId(), WaitingStatus.WAITING);
+        long currentWaitingCount = waitingRepository.countByStoreIdAndStatusIn(
+                store.getId(), Arrays.asList(WaitingStatus.WAITING, WaitingStatus.CALL));
         int myQueueNumber = (int) currentWaitingCount + 1;
         int expectedWaitMin = myQueueNumber * store.getAverageWaiting();
 
@@ -61,7 +63,13 @@ public class WaitingService {
                 .ticketTime(LocalDateTime.now())
                 .build();
 
-        return waitingRepository.save(waiting).getId();
+        waiting = waitingRepository.save(waiting);
+
+        if (myQueueNumber == 3) {
+            notificationService.sendToClient(member.getId(), "📢 대기 순번이 3번째입니다! 매장 앞에서 대기해 주세요.");
+        }
+
+        return waiting.getId();
     }
 
     @Transactional
@@ -82,6 +90,8 @@ public class WaitingService {
         // 2. 상태 변경
         waiting.changeStatus(WaitingStatus.CANCEL);
 
+        waitingRepository.flush();
+
         // 3. 내가 상위 3등 이내여서 줄의 변동이 생겼을 때만 3번째 사람에게 알림 전송
         if (shouldNotify) {
             checkAndNotifyThirdInLine(waiting.getStore().getId());
@@ -99,10 +109,10 @@ public class WaitingService {
                     Long teamsAhead = 0L;
                     Integer expectedWaitMin = 0;
 
-                    if (waiting.getStatus() == WaitingStatus.WAITING) {
-                        teamsAhead = waitingRepository.countByStoreIdAndStatusAndTicketTimeLessThan(
+                    if (waiting.getStatus() == WaitingStatus.WAITING || waiting.getStatus() == WaitingStatus.CALL) {
+                        teamsAhead = waitingRepository.countByStoreIdAndStatusInAndTicketTimeLessThan(
                                 waiting.getStore().getId(),
-                                WaitingStatus.WAITING,
+                                Arrays.asList(WaitingStatus.WAITING, WaitingStatus.CALL),
                                 waiting.getTicketTime()
                         );
                         expectedWaitMin = (int) (teamsAhead * waiting.getStore().getAverageWaiting());
@@ -124,7 +134,7 @@ public class WaitingService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED_STORE_OWNER);
         }
 
-        return waitingRepository.findAllByStoreIdAndStatus(storeId, status).stream()
+        return waitingRepository.findAllByStoreIdAndStatusOrderByTicketTimeAsc(storeId, status).stream()
                 .map(waiting -> WaitingResponse.of(waiting, 0L, 0))
                 .collect(Collectors.toList());
     }
@@ -146,6 +156,8 @@ public class WaitingService {
 
         // 2. 상태 변경
         waiting.changeStatus(request.status());
+
+        waitingRepository.flush();
 
         // 3. 조건에 맞는 알림 전송
         switch (request.status()) {
@@ -187,6 +199,8 @@ public class WaitingService {
         // 2. 순서 맨 뒤로 미루기 (ticketTime 갱신)
         waiting.postpone();
 
+        waitingRepository.flush();
+
         if (shouldNotify) {
             checkAndNotifyThirdInLine(waiting.getStore().getId());
         }
@@ -198,9 +212,9 @@ public class WaitingService {
         }
 
         // 내 티켓 시간보다 먼저 발권한 'WAITING' 상태의 사람 수를 센다 (= 내 앞에 대기 중인 팀 수)
-        long teamsAhead = waitingRepository.countByStoreIdAndStatusAndTicketTimeLessThan(
+        long teamsAhead = waitingRepository.countByStoreIdAndStatusInAndTicketTimeLessThan(
                 waiting.getStore().getId(),
-                WaitingStatus.WAITING,
+                Arrays.asList(WaitingStatus.WAITING, WaitingStatus.CALL),
                 waiting.getTicketTime()
         );
 

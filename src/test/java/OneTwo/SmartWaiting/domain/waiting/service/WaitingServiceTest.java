@@ -372,7 +372,7 @@ class WaitingServiceTest {
         when(mockStore.getOwnerId()).thenReturn(200L);
         when(mockOwner.getId()).thenReturn(200L);
 
-        when(waitingRepository.findAllByStoreIdAndStatus(storeId, WaitingStatus.WAITING))
+        when(waitingRepository.findAllByStoreIdAndStatusOrderByTicketTimeAsc(storeId, WaitingStatus.WAITING))
                 .thenReturn(List.of(mockWaiting));
 
         when(mockWaiting.getId()).thenReturn(10L);
