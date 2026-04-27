@@ -32,6 +32,9 @@ public class Member extends BaseEntity {
 
     private String provider;
 
+    @Column(name = "no_show_count", nullable = false)
+    private int noShowCount = 0;
+
     @Column(name = "fcm_token")
     private String fcmToken;
 
@@ -50,6 +53,14 @@ public class Member extends BaseEntity {
         if(this.loginId != null){
             this.loginId = "deleted_" + System.currentTimeMillis() + "_" + this.loginId;
         }
+    }
+
+    public void incrementNoShowCount() {
+        this.noShowCount++;
+    }
+
+    public boolean isBlacklisted() {
+        return this.noShowCount >= 3;
     }
 
     public void updateFcmToken(String fcmToken){
