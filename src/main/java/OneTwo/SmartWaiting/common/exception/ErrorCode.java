@@ -46,7 +46,10 @@ public enum ErrorCode {
 
     // ===== 즐겨찾기 (Favorite) =====
     FAVORITE_NOT_FOUND(HttpStatus.NOT_FOUND, "F001", "즐겨찾기 내역이 존재하지 않습니다."),
-    ALREADY_FAVORITE(HttpStatus.CONFLICT, "F002", "이미 즐겨찾기 한 식당입니다.");
+    ALREADY_FAVORITE(HttpStatus.CONFLICT, "F002", "이미 즐겨찾기 한 식당입니다."),
+
+    // ===== 기타 (Other) =====
+    BLACKLISTED_MEMBER(HttpStatus.FORBIDDEN, "O001", "블랙리스트에 등록된 회원입니다. 이용이 제한됩니다.");
 
     private final HttpStatus status;
     private final String code;

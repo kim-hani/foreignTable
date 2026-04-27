@@ -43,6 +43,10 @@ public class WaitingService {
         Member member = memberRepository.findByEmail(email)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
+        if(member.isBlacklisted()){
+            throw new BusinessException(ErrorCode.BLACKLISTED_MEMBER);
+        }
+
         if (waitingRepository.existsByMemberIdAndStoreIdAndStatus(member.getId(), store.getId(), WaitingStatus.WAITING)) {
             throw new BusinessException(ErrorCode.WAITING_ALREADY_EXISTS);
         }
@@ -156,6 +160,10 @@ public class WaitingService {
 
         // 2. 상태 변경
         waiting.changeStatus(request.status());
+
+        if(request.status() == WaitingStatus.NOSHOW){
+            waiting.getMember().incrementNoShowCount();
+        }
 
         waitingRepository.flush();
 

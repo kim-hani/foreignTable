@@ -34,4 +34,6 @@ public interface WaitingRepository extends JpaRepository<Waiting, Long> {
     Page<Waiting> findByStoreIdAndStatusInOrderByTicketTimeAsc(Long storeId, List<WaitingStatus> statuses, Pageable pageable);
 
     List<Waiting> findAllByStatusAndUpdatedAtBetween(WaitingStatus status, LocalDateTime start, LocalDateTime end);
+
+    List<Waiting> findAllByStatusIn(List<WaitingStatus> list);
 }
