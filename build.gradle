@@ -47,6 +47,9 @@ dependencies {
 	implementation platform("org.springframework.ai:spring-ai-bom:2.0.0-M4")
 	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
 
+	// FCM (Firebase Cloud Messaging)
+	implementation 'com.google.firebase:firebase-admin:9.2.0'
+
 	compileOnly 'org.projectlombok:lombok'
 
 	runtimeOnly 'org.postgresql:postgresql'
