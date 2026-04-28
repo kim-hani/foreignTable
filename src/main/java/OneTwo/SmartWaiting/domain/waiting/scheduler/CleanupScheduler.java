@@ -1,6 +1,8 @@
 package OneTwo.SmartWaiting.domain.waiting.scheduler;
 
 import OneTwo.SmartWaiting.domain.notification.service.NotificationService;
+import OneTwo.SmartWaiting.domain.store.repository.StoreRepository;
+import OneTwo.SmartWaiting.domain.store.service.StoreStatisticService;
 import OneTwo.SmartWaiting.domain.waiting.entity.Waiting;
 import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
 import OneTwo.SmartWaiting.domain.waiting.repository.WaitingRepository;
@@ -10,6 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 
@@ -20,6 +23,7 @@ public class CleanupScheduler {
 
     private final WaitingRepository waitingRepository;
     private final NotificationService notificationService;
+    private final StoreStatisticService storeStatisticService;
 
     @Scheduled(cron = "0 0 4 * * ?")  // 매일 새벽 4시에 실행
     @Transactional
@@ -44,5 +48,20 @@ public class CleanupScheduler {
         }
 
         log.info("유령 웨이팅 정리 작업 완료. 총 {}건 정리됨", cleanupCount);
+
+        log.info("==== 식당별 통계 데이터 집계 시작 ====");
+
+        LocalDateTime yesterday = LocalDateTime.now().minusDays(1);
+        List<Long> activeStoreIds = waitingRepository.findStoreIdsWithWaitingsSince(yesterday);
+
+        for(Long storeId : activeStoreIds){
+            try{
+                storeStatisticService.calculateAndSaveStoreStats(storeId);
+            }catch(Exception e){
+                log.error("식당별 통계 데이터 집계 중 오류 발생. Store ID: {}, Error: {}", storeId, e.getMessage());
+            }
+        }
+
+        log.info("모든 심야 배치 작업 완료");
     }
 }

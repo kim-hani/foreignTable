@@ -1,5 +1,6 @@
 package OneTwo.SmartWaiting.domain.store.dto.responseDto;
 
+import OneTwo.SmartWaiting.domain.store.entity.HourlyStatVo;
 import OneTwo.SmartWaiting.domain.store.entity.MenuItemVo;
 import OneTwo.SmartWaiting.domain.store.entity.Store;
 import OneTwo.SmartWaiting.domain.store.enums.StoreCategory;
@@ -15,7 +16,8 @@ public record StoreResponseDto(
         Double latitude,
         Double longitude,
         Map<String, String> businessHours,
-        List<MenuItemVo> menuItems
+        List<MenuItemVo> menuItems,
+        Map<String,List<HourlyStatVo>> weeklyWaitingStats
 ) {
     // Entity -> DTO 변환을 위한 정적 팩토리 메서드 (추천 패턴)
     public static StoreResponseDto from(Store store) {
@@ -27,7 +29,8 @@ public record StoreResponseDto(
                 store.getLocation().getY(), // 위도 (Latitude)
                 store.getLocation().getX(), // 경도 (Longitude)
                 store.getBusinessHours(),
-                store.getMenuItems()
+                store.getMenuItems(),
+                store.getWeeklyWaitingStats()
         );
     }
 }
