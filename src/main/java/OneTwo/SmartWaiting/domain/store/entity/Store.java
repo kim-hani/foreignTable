@@ -61,4 +61,12 @@ public class Store extends BaseEntity {
         this.businessHours = businessHours;
         this.menuItems = menuItems;
     }
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "weekly_waiting_stats",columnDefinition = "json")
+    private Map<String,List<HourlyStatVo>> weeklyWaitingStats;
+
+    public void updateWeeklyStats(Map<String,List<HourlyStatVo>> weeklyWaitingStats) {
+        this.weeklyWaitingStats = weeklyWaitingStats;
+    }
 }

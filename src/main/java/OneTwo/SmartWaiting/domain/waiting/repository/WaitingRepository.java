@@ -1,5 +1,6 @@
 package OneTwo.SmartWaiting.domain.waiting.repository;
 
+import OneTwo.SmartWaiting.domain.waiting.dto.WaitingStatProjection;
 import OneTwo.SmartWaiting.domain.waiting.entity.Waiting;
 import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
 import org.springframework.data.domain.Page;
@@ -36,4 +37,21 @@ public interface WaitingRepository extends JpaRepository<Waiting, Long> {
     List<Waiting> findAllByStatusAndUpdatedAtBetween(WaitingStatus status, LocalDateTime start, LocalDateTime end);
 
     List<Waiting> findAllByStatusIn(List<WaitingStatus> list);
+
+    // 최근 하루 동안 웨이팅이 발생한 '활성화된' 식당 ID만 조회
+    @Query("SELECT DISTINCT w.store.id FROM Waiting w WHERE w.ticketTime >= :yesterday")
+    List<Long> findStoreIdsWithWaitingsSince(@Param("yesterday") LocalDateTime yesterday);
+
+    // 자바 대신 DB가 직접 요일별/시간별 평균을 계산해서 반환!
+    // ISODOW: 1(월요일) ~ 7(일요일) 반환
+    @Query(value = "SELECT " +
+            "  CAST(EXTRACT(ISODOW FROM ticket_time) AS INTEGER) AS dayOfWeek, " +
+            "  CAST(EXTRACT(HOUR FROM ticket_time) AS INTEGER) AS hourOfDay, " +
+            "  COUNT(*) / 4.0 AS avgTeams, " +
+            "  AVG(expected_wait_min) AS avgWaitMin " +
+            "FROM waiting " +
+            "WHERE store_id = :storeId AND ticket_time >= :oneMonthAgo " +
+            "GROUP BY EXTRACT(ISODOW FROM ticket_time), EXTRACT(HOUR FROM ticket_time)",
+            nativeQuery = true)
+    List<WaitingStatProjection> findWaitingStatsByStoreId(@Param("storeId") Long storeId, @Param("oneMonthAgo") LocalDateTime oneMonthAgo);
 }
