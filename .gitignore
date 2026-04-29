@@ -36,3 +36,8 @@ out/
 ### VS Code ###
 .vscode/
 .aider*
+
+### Security & Docker ###
+.env
+postgres_data/
+src/main/resources/firebase-service-account.json
