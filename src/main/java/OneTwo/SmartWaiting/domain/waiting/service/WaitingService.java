@@ -229,7 +229,8 @@ public class WaitingService {
                 Arrays.asList(WaitingStatus.WAITING, WaitingStatus.CALL),
                 waiting.getTicketTime()
         );
-        return teamsAhead < 2;
+        // 내가 정확히 1등일 때만 true — 내가 빠져야 새로운 1등이 생기는 경우
+        return teamsAhead == 0;
     }
 
     boolean isTop3(Waiting waiting) {
