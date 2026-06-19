@@ -44,3 +44,7 @@ src/main/resources/firebase-service-account.json
 
 ### Shrimp Task Manager ###
 .shrimp-tasks/
+data/
+
+### Claude Code ###
+.claude/settings.local.json

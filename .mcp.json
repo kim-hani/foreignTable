@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "shrimp-task-manager": {
+      "command": "npx",
+      "args": ["-y", "mcp-shrimp-task-manager"],
+      "env": {
+        "TASK_MANAGER_DATA_DIR": "${workspaceFolder}/.shrimp-tasks"
+      }
+    }
+  }
+}
