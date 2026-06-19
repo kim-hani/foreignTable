@@ -41,3 +41,6 @@ out/
 .env
 postgres_data/
 src/main/resources/firebase-service-account.json
+
+### Shrimp Task Manager ###
+.shrimp-tasks/

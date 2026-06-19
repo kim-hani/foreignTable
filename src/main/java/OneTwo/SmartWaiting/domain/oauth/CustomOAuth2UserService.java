@@ -14,6 +14,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 @Service
@@ -23,36 +24,59 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
     private final MemberRepository memberRepository;
 
     @Override
+    @SuppressWarnings("unchecked")
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
-        // 1. 구글 서버에서 유저 정보 가져오기
         OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate = new DefaultOAuth2UserService();
         OAuth2User oAuth2User = delegate.loadUser(userRequest);
 
-        // 2. 데이터 추출
+        String provider = userRequest.getClientRegistration().getRegistrationId();
         String userNameAttributeName = userRequest.getClientRegistration()
-                .getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName(); // "sub"
+                .getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName();
 
         Map<String, Object> attributes = oAuth2User.getAttributes();
-        String email = (String) attributes.get("email");
-        String name = (String) attributes.get("name");
+        Map<String, Object> normalizedAttributes = new HashMap<>(attributes);
 
-        // 3. 저장 또는 업데이트
-        Member member = saveOrUpdate(email, name);
+        String email;
+        String name;
 
-        // 4. 시큐리티용 유저 객체 반환
+        switch (provider) {
+            case "kakao" -> {
+                Map<String, Object> kakaoAccount = (Map<String, Object>) attributes.get("kakao_account");
+                Map<String, Object> properties = (Map<String, Object>) attributes.get("properties");
+                email = (String) kakaoAccount.get("email");
+                name = (String) properties.get("nickname");
+                // OAuth2SuccessHandler가 attributes.get("email")로 접근하므로 최상위에 주입
+                normalizedAttributes.put("email", email);
+            }
+            case "naver" -> {
+                Map<String, Object> naverResponse = (Map<String, Object>) attributes.get("response");
+                email = (String) naverResponse.get("email");
+                name = (String) naverResponse.get("name");
+                normalizedAttributes.put("email", email);
+            }
+            default -> {
+                // google
+                email = (String) attributes.get("email");
+                name = (String) attributes.get("name");
+            }
+        }
+
+        Member member = saveOrUpdate(email, name, provider);
+
         return new DefaultOAuth2User(
                 Collections.singleton(new SimpleGrantedAuthority(member.getRole().getAuthority())),
-                attributes,
+                normalizedAttributes,
                 userNameAttributeName
         );
     }
 
-    private Member saveOrUpdate(String email, String name) {
+    private Member saveOrUpdate(String email, String name, String provider) {
         Member member = memberRepository.findByEmail(email)
                 .orElse(Member.builder()
                         .email(email)
                         .nickname(name)
-                        .role(UserRole.USER) // 기본 권한
+                        .role(UserRole.USER)
+                        .provider(provider)
                         .build());
 
         return memberRepository.save(member);
