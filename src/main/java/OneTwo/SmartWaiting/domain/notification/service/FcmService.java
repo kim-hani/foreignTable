@@ -16,6 +16,29 @@ public class FcmService {
      * @param body        알림 내용
      * @param storeId     이동할 식당 ID (클릭 시 이동용)
      */
+    public void sendFirstInLinePush(String targetToken, Long storeId) {
+        if (targetToken == null || targetToken.isEmpty()) {
+            return;
+        }
+
+        Message message = Message.builder()
+                .setToken(targetToken)
+                .setNotification(Notification.builder()
+                        .setTitle("입장 직전 알림")
+                        .setBody("🚨 곧 입장하실 차례입니다! 매장 앞에 대기해 주세요.")
+                        .build())
+                .putData("type", "FIRST_IN_LINE")
+                .putData("storeId", String.valueOf(storeId))
+                .build();
+
+        try {
+            FirebaseMessaging.getInstance().send(message);
+            log.info("입장 직전 푸시 알림 발송 성공! (Token: {})", targetToken);
+        } catch (Exception e) {
+            log.error("푸시 알림 발송 실패", e);
+        }
+    }
+
     public void sendReviewRequestPush(String targetToken, String title, String body, Long storeId) {
         if (targetToken == null || targetToken.isEmpty()) {
             return; // 토큰이 없으면 안 보냄

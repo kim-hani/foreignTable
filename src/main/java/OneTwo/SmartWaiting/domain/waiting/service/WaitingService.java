@@ -4,6 +4,7 @@ import OneTwo.SmartWaiting.common.exception.BusinessException;
 import OneTwo.SmartWaiting.common.exception.ErrorCode;
 import OneTwo.SmartWaiting.domain.member.entity.Member;
 import OneTwo.SmartWaiting.domain.member.repository.MemberRepository;
+import OneTwo.SmartWaiting.domain.notification.service.FcmService;
 import OneTwo.SmartWaiting.domain.notification.service.NotificationService;
 import OneTwo.SmartWaiting.domain.store.entity.Store;
 import OneTwo.SmartWaiting.domain.store.repository.StoreRepository;
@@ -33,6 +34,7 @@ public class WaitingService {
     private final StoreRepository storeRepository;
     private final MemberRepository memberRepository;
     private final NotificationService notificationService;
+    private final FcmService fcmService;
 
     @Transactional
     public Long registerWaiting(WaitingRegisterRequestDto requestDto, String email) {
@@ -88,17 +90,18 @@ public class WaitingService {
             throw new BusinessException(ErrorCode.NOT_YOUR_WAITING);
         }
 
-        // 1. 상태를 변경하기 전에 내가 상위 3등 이내였는지 미리 확인
         boolean shouldNotify = isTop3(waiting);
+        boolean shouldNotifyFirst = isTop2(waiting);
 
-        // 2. 상태 변경
         waiting.changeStatus(WaitingStatus.CANCEL);
 
         waitingRepository.flush();
 
-        // 3. 내가 상위 3등 이내여서 줄의 변동이 생겼을 때만 3번째 사람에게 알림 전송
         if (shouldNotify) {
             checkAndNotifyThirdInLine(waiting.getStore().getId());
+        }
+        if (shouldNotifyFirst) {
+            checkAndNotifyFirstInLine(waiting.getStore().getId());
         }
 
         notificationService.closeConnection(waiting.getMember().getId());
@@ -155,10 +158,9 @@ public class WaitingService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED_STORE_OWNER);
         }
 
-        // 1. 상태 변경 전 상위 3등 이내인지 확인
         boolean shouldNotify = isTop3(waiting);
+        boolean shouldNotifyFirst = isTop2(waiting);
 
-        // 2. 상태 변경
         waiting.changeStatus(request.status());
 
         if(request.status() == WaitingStatus.NOSHOW){
@@ -167,7 +169,6 @@ public class WaitingService {
 
         waitingRepository.flush();
 
-        // 3. 조건에 맞는 알림 전송
         switch (request.status()) {
             case CALL:
                 notificationService.sendToClient(waiting.getMember().getId(), "📢 사장님이 호출하셨습니다! 매장으로 입장해 주세요.");
@@ -175,8 +176,11 @@ public class WaitingService {
             case SEATED:
             case CANCEL:
             case NOSHOW:
-                if (shouldNotify) { // 줄의 변동(상위 3명 이내)이 생겼을 때만 쏜다
+                if (shouldNotify) {
                     checkAndNotifyThirdInLine(waiting.getStore().getId());
+                }
+                if (shouldNotifyFirst) {
+                    checkAndNotifyFirstInLine(waiting.getStore().getId());
                 }
                 notificationService.closeConnection(waiting.getMember().getId());
                 break;
@@ -201,10 +205,9 @@ public class WaitingService {
             throw new BusinessException(ErrorCode.INVALID_WAITING_STATUS);
         }
 
-        // 1. 미루기 전 내가 상위 3등 이내였는지 확인
         boolean shouldNotify = isTop3(waiting);
+        boolean shouldNotifyFirst = isTop2(waiting);
 
-        // 2. 순서 맨 뒤로 미루기 (ticketTime 갱신)
         waiting.postpone();
 
         waitingRepository.flush();
@@ -212,6 +215,21 @@ public class WaitingService {
         if (shouldNotify) {
             checkAndNotifyThirdInLine(waiting.getStore().getId());
         }
+        if (shouldNotifyFirst) {
+            checkAndNotifyFirstInLine(waiting.getStore().getId());
+        }
+    }
+
+    boolean isTop2(Waiting waiting) {
+        if (waiting.getStatus() != WaitingStatus.WAITING && waiting.getStatus() != WaitingStatus.CALL) {
+            return false;
+        }
+        long teamsAhead = waitingRepository.countByStoreIdAndStatusInAndTicketTimeLessThan(
+                waiting.getStore().getId(),
+                Arrays.asList(WaitingStatus.WAITING, WaitingStatus.CALL),
+                waiting.getTicketTime()
+        );
+        return teamsAhead < 2;
     }
 
     boolean isTop3(Waiting waiting) {
@@ -228,6 +246,22 @@ public class WaitingService {
 
         // 내 앞의 대기팀이 0팀(내가 1등), 1팀(내가 2등), 2팀(내가 3등)인 경우에만 true 반환
         return teamsAhead < 3;
+    }
+
+    private void checkAndNotifyFirstInLine(Long storeId) {
+        PageRequest pageRequest = PageRequest.of(0, 1);
+        Page<Waiting> firstWaitingPage = waitingRepository.findByStoreIdAndStatusOrderByTicketTimeAsc(
+                storeId, WaitingStatus.WAITING, pageRequest
+        );
+
+        if (firstWaitingPage.hasContent()) {
+            Waiting firstWaiting = firstWaitingPage.getContent().get(0);
+            Long memberId = firstWaiting.getMember().getId();
+            String fcmToken = firstWaiting.getMember().getFcmToken();
+
+            notificationService.sendToClient(memberId, "🚨 곧 입장하실 차례입니다! 매장 앞에 대기해 주세요.");
+            fcmService.sendFirstInLinePush(fcmToken, storeId);
+        }
     }
 
     private void checkAndNotifyThirdInLine(Long storeId) {
