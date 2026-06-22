@@ -74,6 +74,7 @@ class WaitingServiceTest {
         Mockito.when(mockStore.getId()).thenReturn(storeId);
         Mockito.when(mockStore.getAverageWaiting()).thenReturn(10);
         Mockito.when(mockStore.getIsAcceptingWaiting()).thenReturn(true);
+        Mockito.when(mockStore.getMaxWaitingCount()).thenReturn(null);
 
         Member mockMember = mock(Member.class);
         Mockito.when(mockMember.getId()).thenReturn(100L);
@@ -162,6 +163,7 @@ class WaitingServiceTest {
         Mockito.when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
         Mockito.when(mockStore.getId()).thenReturn(storeId);
         Mockito.when(mockStore.getIsAcceptingWaiting()).thenReturn(true);
+        Mockito.when(mockStore.getMaxWaitingCount()).thenReturn(null);
 
         Member mockMember = mock(Member.class);
         Mockito.when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
@@ -169,6 +171,94 @@ class WaitingServiceTest {
         Mockito.when(waitingRepository.existsByMemberIdAndStoreIdAndStatus(100L, storeId, WaitingStatus.WAITING)).thenReturn(true);
 
         Assertions.assertThrows(BusinessException.class, () -> waitingService.registerWaiting(requestDto, email));
+    }
+
+    @Test
+    @DisplayName("웨이팅 등록 성공 - 최대 대기 팀 수 미설정(null)이면 제한 없이 등록된다")
+    void registerWaiting_Success_NoMaxWaitingCount() {
+        String email = "test@gmail.com";
+        Long storeId = 1L;
+        WaitingRegisterRequestDto requestDto = WaitingRegisterRequestDto.builder()
+                .storeId(storeId).headCount(2).build();
+
+        Store mockStore = mock(Store.class);
+        when(mockStore.getId()).thenReturn(storeId);
+        when(mockStore.getAverageWaiting()).thenReturn(10);
+        when(mockStore.getIsAcceptingWaiting()).thenReturn(true);
+        when(mockStore.getMaxWaitingCount()).thenReturn(null);
+
+        Member mockMember = mock(Member.class);
+        when(mockMember.getId()).thenReturn(100L);
+
+        when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
+        when(waitingRepository.existsByMemberIdAndStoreIdAndStatus(100L, storeId, WaitingStatus.WAITING)).thenReturn(false);
+        when(waitingRepository.countByStoreIdAndStatusIn(eq(storeId), any())).thenReturn(3L);
+
+        Waiting mockSaved = mock(Waiting.class);
+        when(mockSaved.getId()).thenReturn(1L);
+        when(waitingRepository.save(any(Waiting.class))).thenReturn(mockSaved);
+
+        Long resultId = waitingService.registerWaiting(requestDto, email);
+
+        assertThat(resultId).isEqualTo(1L);
+        verify(waitingRepository, times(1)).save(any(Waiting.class));
+    }
+
+    @Test
+    @DisplayName("웨이팅 등록 성공 - 현재 대기 수가 상한 미만이면 등록된다")
+    void registerWaiting_Success_UnderMaxWaitingCount() {
+        String email = "test@gmail.com";
+        Long storeId = 1L;
+        WaitingRegisterRequestDto requestDto = WaitingRegisterRequestDto.builder()
+                .storeId(storeId).headCount(2).build();
+
+        Store mockStore = mock(Store.class);
+        when(mockStore.getId()).thenReturn(storeId);
+        when(mockStore.getAverageWaiting()).thenReturn(10);
+        when(mockStore.getIsAcceptingWaiting()).thenReturn(true);
+        when(mockStore.getMaxWaitingCount()).thenReturn(10);
+
+        Member mockMember = mock(Member.class);
+        when(mockMember.getId()).thenReturn(100L);
+
+        when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
+        when(waitingRepository.countByStoreIdAndStatusIn(eq(storeId), any())).thenReturn(9L);
+        when(waitingRepository.existsByMemberIdAndStoreIdAndStatus(100L, storeId, WaitingStatus.WAITING)).thenReturn(false);
+
+        Waiting mockSaved = mock(Waiting.class);
+        when(mockSaved.getId()).thenReturn(2L);
+        when(waitingRepository.save(any(Waiting.class))).thenReturn(mockSaved);
+
+        Long resultId = waitingService.registerWaiting(requestDto, email);
+
+        assertThat(resultId).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("웨이팅 등록 실패 - 현재 대기 수가 최대 상한에 도달하면 WAITING_QUEUE_FULL 예외 발생")
+    void registerWaiting_Fail_WaitingQueueFull() {
+        String email = "test@gmail.com";
+        Long storeId = 1L;
+        WaitingRegisterRequestDto requestDto = WaitingRegisterRequestDto.builder()
+                .storeId(storeId).headCount(2).build();
+
+        Store mockStore = mock(Store.class);
+        when(mockStore.getId()).thenReturn(storeId);
+        when(mockStore.getIsAcceptingWaiting()).thenReturn(true);
+        when(mockStore.getMaxWaitingCount()).thenReturn(10);
+
+        Member mockMember = mock(Member.class);
+
+        when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
+        when(waitingRepository.countByStoreIdAndStatusIn(eq(storeId), any())).thenReturn(10L);
+
+        BusinessException exception = Assertions.assertThrows(BusinessException.class,
+                () -> waitingService.registerWaiting(requestDto, email));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.WAITING_QUEUE_FULL);
     }
 
     // ==================== cancelWaiting ====================

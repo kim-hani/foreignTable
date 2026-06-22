@@ -277,7 +277,8 @@ class StoreServiceTest {
                 eq(requestDto.averageWaiting()),
                 any(Point.class),
                 eq(requestDto.businessHours()),
-                eq(requestDto.menuItems())
+                eq(requestDto.menuItems()),
+                eq(requestDto.maxWaitingCount())
         );
     }
 
@@ -503,7 +504,8 @@ class StoreServiceTest {
                 latitude,
                 longitude,
                 Map.of("화", "10:00-22:00"),
-                Collections.emptyList()
+                Collections.emptyList(),
+                null
         );
     }
 }

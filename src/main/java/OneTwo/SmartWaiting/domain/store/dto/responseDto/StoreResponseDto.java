@@ -18,7 +18,8 @@ public record StoreResponseDto(
         Map<String, String> businessHours,
         List<MenuItemVo> menuItems,
         Map<String,List<HourlyStatVo>> weeklyWaitingStats,
-        Boolean isAcceptingWaiting
+        Boolean isAcceptingWaiting,
+        Integer maxWaitingCount
 ) {
     public static StoreResponseDto from(Store store) {
         return new StoreResponseDto(
@@ -31,7 +32,8 @@ public record StoreResponseDto(
                 store.getBusinessHours(),
                 store.getMenuItems(),
                 store.getWeeklyWaitingStats(),
-                store.getIsAcceptingWaiting()
+                store.getIsAcceptingWaiting(),
+                store.getMaxWaitingCount()
         );
     }
 }

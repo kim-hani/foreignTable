@@ -40,6 +40,9 @@ public class Store extends BaseEntity {
     @Builder.Default
     private Boolean isAcceptingWaiting = true;
 
+    @Column
+    private Integer maxWaitingCount;
+
     // [PostGis] 위치 정보 매핑
     // SRID 4326 = WGS 84(GPS 좌표계)
     @Column(columnDefinition = "geometry(point, 4326)")
@@ -56,14 +59,16 @@ public class Store extends BaseEntity {
     private List<MenuItemVo> menuItems;
 
     public void updateInfo(String name, String phone, StoreCategory category, Integer averageWaiting,
-                           Point location, Map<String, String> businessHours, List<MenuItemVo> menuItems) {
+                           Point location, Map<String, String> businessHours, List<MenuItemVo> menuItems,
+                           Integer maxWaitingCount) {
         this.name = name;
         this.phone = phone;
         this.category = category;
         this.averageWaiting = averageWaiting != null ? averageWaiting : this.averageWaiting;
-        this.location = location; // 위치 업데이트
+        this.location = location;
         this.businessHours = businessHours;
         this.menuItems = menuItems;
+        this.maxWaitingCount = maxWaitingCount;
     }
 
     @JdbcTypeCode(SqlTypes.JSON)

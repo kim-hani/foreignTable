@@ -90,9 +90,10 @@ public class StoreService {
                 request.phone(),
                 StoreCategory.from(request.category()),
                 request.averageWaiting(),
-                updatedLocation, // 위치 정보 전달
+                updatedLocation,
                 request.businessHours(),
-                request.menuItems()
+                request.menuItems(),
+                request.maxWaitingCount()
         );
     }
 

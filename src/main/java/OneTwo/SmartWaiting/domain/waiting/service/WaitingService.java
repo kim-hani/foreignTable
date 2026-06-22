@@ -49,6 +49,14 @@ public class WaitingService {
             throw new BusinessException(ErrorCode.STORE_NOT_ACCEPTING_WAITING);
         }
 
+        if (store.getMaxWaitingCount() != null) {
+            long activeCount = waitingRepository.countByStoreIdAndStatusIn(
+                    store.getId(), Arrays.asList(WaitingStatus.WAITING, WaitingStatus.CALL));
+            if (activeCount >= store.getMaxWaitingCount()) {
+                throw new BusinessException(ErrorCode.WAITING_QUEUE_FULL);
+            }
+        }
+
         if(member.isBlacklisted()){
             throw new BusinessException(ErrorCode.BLACKLISTED_MEMBER);
         }
