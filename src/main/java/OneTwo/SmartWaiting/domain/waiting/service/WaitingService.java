@@ -45,6 +45,10 @@ public class WaitingService {
         Member member = memberRepository.findByEmail(email)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
+        if (!store.getIsAcceptingWaiting()) {
+            throw new BusinessException(ErrorCode.STORE_NOT_ACCEPTING_WAITING);
+        }
+
         if(member.isBlacklisted()){
             throw new BusinessException(ErrorCode.BLACKLISTED_MEMBER);
         }

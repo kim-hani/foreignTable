@@ -17,20 +17,21 @@ public record StoreResponseDto(
         Double longitude,
         Map<String, String> businessHours,
         List<MenuItemVo> menuItems,
-        Map<String,List<HourlyStatVo>> weeklyWaitingStats
+        Map<String,List<HourlyStatVo>> weeklyWaitingStats,
+        Boolean isAcceptingWaiting
 ) {
-    // Entity -> DTO 변환을 위한 정적 팩토리 메서드 (추천 패턴)
     public static StoreResponseDto from(Store store) {
         return new StoreResponseDto(
                 store.getId(),
                 store.getName(),
                 store.getCategory(),
-                store.getPhone(), // Store 엔티티에 phone 필드가 있다고 가정
-                store.getLocation().getY(), // 위도 (Latitude)
-                store.getLocation().getX(), // 경도 (Longitude)
+                store.getPhone(),
+                store.getLocation().getY(),
+                store.getLocation().getX(),
                 store.getBusinessHours(),
                 store.getMenuItems(),
-                store.getWeeklyWaitingStats()
+                store.getWeeklyWaitingStats(),
+                store.getIsAcceptingWaiting()
         );
     }
 }

@@ -388,6 +388,93 @@ class StoreServiceTest {
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.UNAUTHORIZED_STORE_OWNER);
     }
 
+    // ================= [ 웨이팅 접수 상태 변경 (WaitingStatus) ] =================
+
+    @Test
+    @DisplayName("웨이팅 접수 중단 성공 - 사장님이 웨이팅 접수를 중단한다.")
+    void updateWaitingStatus_Success_Stop() {
+        // given
+        Long storeId = 1L;
+        String email = "owner@gmail.com";
+
+        Store mockStore = mock(Store.class);
+        when(mockStore.getOwnerId()).thenReturn(1L);
+
+        Member mockOwner = mock(Member.class);
+        when(mockOwner.getId()).thenReturn(1L);
+
+        when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockOwner));
+
+        // when
+        storeService.updateWaitingStatus(storeId, email, false);
+
+        // then
+        verify(mockStore, times(1)).updateWaitingAcceptance(false);
+    }
+
+    @Test
+    @DisplayName("웨이팅 접수 재개 성공 - 사장님이 웨이팅 접수를 재개한다.")
+    void updateWaitingStatus_Success_Resume() {
+        // given
+        Long storeId = 1L;
+        String email = "owner@gmail.com";
+
+        Store mockStore = mock(Store.class);
+        when(mockStore.getOwnerId()).thenReturn(1L);
+
+        Member mockOwner = mock(Member.class);
+        when(mockOwner.getId()).thenReturn(1L);
+
+        when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockOwner));
+
+        // when
+        storeService.updateWaitingStatus(storeId, email, true);
+
+        // then
+        verify(mockStore, times(1)).updateWaitingAcceptance(true);
+    }
+
+    @Test
+    @DisplayName("웨이팅 접수 상태 변경 실패 - 존재하지 않는 식당")
+    void updateWaitingStatus_Fail_StoreNotFound() {
+        // given
+        Long storeId = 999L;
+        String email = "owner@gmail.com";
+
+        when(storeRepository.findById(storeId)).thenReturn(Optional.empty());
+
+        // when & then
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> storeService.updateWaitingStatus(storeId, email, false));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.STORE_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("웨이팅 접수 상태 변경 실패 - 본인 소유의 가게가 아님(권한 없음)")
+    void updateWaitingStatus_Fail_UnauthorizedOwner() {
+        // given
+        Long storeId = 1L;
+        String email = "hacker@gmail.com";
+
+        Store mockStore = mock(Store.class);
+        when(mockStore.getOwnerId()).thenReturn(1L);
+
+        Member mockHacker = mock(Member.class);
+        when(mockHacker.getId()).thenReturn(2L);
+
+        when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockHacker));
+
+        // when & then
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> storeService.updateWaitingStatus(storeId, email, false));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.UNAUTHORIZED_STORE_OWNER);
+    }
+
     // ================= [ Helper Methods ] =================
 
     private StoreCreateRequestDto createDefaultCreateRequestDto() {

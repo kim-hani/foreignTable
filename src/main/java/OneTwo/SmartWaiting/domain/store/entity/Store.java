@@ -36,6 +36,10 @@ public class Store extends BaseEntity {
     @Builder.Default
     private Integer averageWaiting = 10;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean isAcceptingWaiting = true;
+
     // [PostGis] 위치 정보 매핑
     // SRID 4326 = WGS 84(GPS 좌표계)
     @Column(columnDefinition = "geometry(point, 4326)")
@@ -68,5 +72,9 @@ public class Store extends BaseEntity {
 
     public void updateWeeklyStats(Map<String,List<HourlyStatVo>> weeklyWaitingStats) {
         this.weeklyWaitingStats = weeklyWaitingStats;
+    }
+
+    public void updateWaitingAcceptance(boolean isAcceptingWaiting) {
+        this.isAcceptingWaiting = isAcceptingWaiting;
     }
 }
