@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 import java.util.List;
 import java.util.Map;
@@ -34,5 +35,8 @@ public record StoreUpdateRequestDto(
         Double longitude,
 
         Map<String, String> businessHours,
-        List<MenuItemVo> menuItems
+        List<MenuItemVo> menuItems,
+
+        @Positive(message = "최대 대기 팀 수는 1 이상이어야 합니다.")
+        Integer maxWaitingCount
 ) {}

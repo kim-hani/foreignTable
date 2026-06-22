@@ -37,6 +37,7 @@ public enum ErrorCode {
     NOT_YOUR_WAITING(HttpStatus.FORBIDDEN, "W004", "본인의 대기 정보만 제어할 수 있습니다."),
     INVALID_WAITING_STATUS(HttpStatus.BAD_REQUEST, "W005", "대기 중인 상태에서만 가능한 작업입니다."),
     STORE_NOT_ACCEPTING_WAITING(HttpStatus.BAD_REQUEST, "W006", "현재 웨이팅 접수가 중단된 식당입니다."),
+    WAITING_QUEUE_FULL(HttpStatus.CONFLICT, "W007", "최대 대기 팀 수에 도달하여 더 이상 웨이팅을 등록할 수 없습니다."),
 
     // ===== 리뷰 (Review) =====
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "R001", "리뷰를 찾을 수 없습니다."),
