@@ -73,6 +73,7 @@ class WaitingServiceTest {
         Store mockStore = mock(Store.class);
         Mockito.when(mockStore.getId()).thenReturn(storeId);
         Mockito.when(mockStore.getAverageWaiting()).thenReturn(10);
+        Mockito.when(mockStore.getIsAcceptingWaiting()).thenReturn(true);
 
         Member mockMember = mock(Member.class);
         Mockito.when(mockMember.getId()).thenReturn(100L);
@@ -125,6 +126,29 @@ class WaitingServiceTest {
     }
 
     @Test
+    @DisplayName("웨이팅 등록 실패 - 웨이팅 접수가 중단된 식당")
+    void registerWaiting_Fail_StoreNotAcceptingWaiting() {
+        String email = "test@gmail.com";
+        Long storeId = 1L;
+        WaitingRegisterRequestDto requestDto = WaitingRegisterRequestDto.builder()
+                .storeId(storeId)
+                .headCount(2)
+                .build();
+
+        Store mockStore = mock(Store.class);
+        Mockito.when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
+        Mockito.when(mockStore.getIsAcceptingWaiting()).thenReturn(false);
+
+        Member mockMember = mock(Member.class);
+        Mockito.when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
+
+        BusinessException exception = Assertions.assertThrows(BusinessException.class,
+                () -> waitingService.registerWaiting(requestDto, email));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.STORE_NOT_ACCEPTING_WAITING);
+    }
+
+    @Test
     @DisplayName("웨이팅 등록 실패 - 이미 대기 중인 웨이팅 존재")
     void registerWaiting_Fail_WaitingAlreadyExists() {
         String email = "test@gmail.com";
@@ -137,6 +161,7 @@ class WaitingServiceTest {
         Store mockStore = mock(Store.class);
         Mockito.when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
         Mockito.when(mockStore.getId()).thenReturn(storeId);
+        Mockito.when(mockStore.getIsAcceptingWaiting()).thenReturn(true);
 
         Member mockMember = mock(Member.class);
         Mockito.when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));

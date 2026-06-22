@@ -2,6 +2,7 @@ package OneTwo.SmartWaiting.domain.store.controller;
 
 import OneTwo.SmartWaiting.domain.store.dto.requestDto.StoreCreateRequestDto;
 import OneTwo.SmartWaiting.domain.store.dto.requestDto.StoreUpdateRequestDto;
+import OneTwo.SmartWaiting.domain.store.dto.requestDto.WaitingStatusUpdateRequestDto;
 import OneTwo.SmartWaiting.domain.store.dto.responseDto.StoreResponseDto;
 import OneTwo.SmartWaiting.domain.store.service.StoreService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -71,6 +72,16 @@ public class StoreController {
             Principal principal) {
         storeService.deleteStore(storeId, principal.getName());
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "웨이팅 접수 상태 변경", description = "사장님(OWNER)이 웨이팅 접수를 일시 중단하거나 재개합니다.")
+    @PatchMapping("/{storeId}/waiting-status")
+    public ResponseEntity<Void> updateWaitingStatus(
+            @PathVariable Long storeId,
+            Principal principal,
+            @RequestBody @Valid WaitingStatusUpdateRequestDto request) {
+        storeService.updateWaitingStatus(storeId, principal.getName(), request.isAcceptingWaiting());
+        return ResponseEntity.ok().build();
     }
 
     @Operation(summary = "식당 검색", description = "식당 이름 혹은 카테고리로 식당 목록을 검색합니다.")

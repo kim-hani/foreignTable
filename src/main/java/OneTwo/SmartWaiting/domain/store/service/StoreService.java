@@ -118,6 +118,13 @@ public class StoreService {
         }
     }
 
+    @Transactional
+    public void updateWaitingStatus(Long storeId, String email, boolean isAcceptingWaiting) {
+        Store store = findStoreOrThrow(storeId);
+        validateOwner(store, email);
+        store.updateWaitingAcceptance(isAcceptingWaiting);
+    }
+
     public Slice<StoreResponseDto> searchStores(String name, String categoryStr, Pageable pageable){
         StoreCategory category = (categoryStr != null && !categoryStr.isBlank()) ? StoreCategory.from(categoryStr) : null;
 
