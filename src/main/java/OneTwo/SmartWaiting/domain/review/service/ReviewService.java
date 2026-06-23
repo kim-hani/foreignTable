@@ -59,6 +59,7 @@ public class ReviewService {
                 .waiting(waiting)
                 .content(request.content())
                 .rating(request.rating())
+                .imageUrls(request.imageUrls())
                 .build();
 
         return reviewRepository.save(review).getId();

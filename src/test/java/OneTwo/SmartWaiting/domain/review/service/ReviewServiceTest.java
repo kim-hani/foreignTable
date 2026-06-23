@@ -193,6 +193,33 @@ class ReviewServiceTest {
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.REVIEW_ALREADY_EXISTS);
     }
 
+    @Test
+    @DisplayName("리뷰 작성 성공 - imageUrls 포함")
+    void createReview_Success_WithImageUrls() {
+        // given
+        String email = "member@test.com";
+        Long waitingId = 1L;
+        List<String> imageUrls = List.of("https://bucket.s3.ap-northeast-2.amazonaws.com/reviews/a.jpg");
+        ReviewCreateRequestDto requestDto = new ReviewCreateRequestDto(waitingId, "맛있어요!", 5, imageUrls);
+
+        Member mockMember = createMockMember(1L, email, "테스트유저");
+        Store mockStore = createMockStore(10L, "테스트식당");
+        Waiting mockWaiting = createMockWaiting(waitingId, mockMember, mockStore, WaitingStatus.SEATED, LocalDateTime.now());
+        Review mockReview = createMockReview(100L, mockMember, mockStore, mockWaiting, requestDto.content(), requestDto.rating());
+
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
+        when(waitingRepository.findById(waitingId)).thenReturn(Optional.of(mockWaiting));
+        when(reviewRepository.existsByWaitingId(waitingId)).thenReturn(false);
+        when(reviewRepository.save(any(Review.class))).thenReturn(mockReview);
+
+        // when
+        Long resultId = reviewService.createReview(requestDto, email);
+
+        // then
+        assertThat(resultId).isEqualTo(100L);
+        verify(reviewRepository, times(1)).save(any(Review.class));
+    }
+
     // ================= [ 가게별 리뷰 조회 (Read) ] =================
 
     @Test
@@ -426,6 +453,6 @@ class ReviewServiceTest {
     }
 
     private ReviewCreateRequestDto createReviewCreateRequestDto(Long waitingId, String content, int rating) {
-        return new ReviewCreateRequestDto(waitingId, content, rating);
+        return new ReviewCreateRequestDto(waitingId, content, rating, null);
     }
 }

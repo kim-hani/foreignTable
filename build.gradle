@@ -50,6 +50,9 @@ dependencies {
 	// FCM (Firebase Cloud Messaging)
 	implementation 'com.google.firebase:firebase-admin:9.2.0'
 
+	// AWS S3
+	implementation 'software.amazon.awssdk:s3:2.25.0'
+
 	compileOnly 'org.projectlombok:lombok'
 
 	runtimeOnly 'org.postgresql:postgresql'

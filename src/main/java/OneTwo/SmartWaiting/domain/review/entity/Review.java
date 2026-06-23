@@ -6,6 +6,10 @@ import OneTwo.SmartWaiting.domain.store.entity.Store;
 import OneTwo.SmartWaiting.domain.waiting.entity.Waiting;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.util.List;
 
 @Entity
 @Getter
@@ -27,5 +31,9 @@ public class Review extends BaseEntity {
     private Waiting waiting;
 
     private String content;
-    private  int rating;
+    private int rating;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "image_urls", columnDefinition = "jsonb")
+    private List<String> imageUrls;
 }
