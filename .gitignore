@@ -49,6 +49,7 @@ data/
 ### Claude Code ###
 .claude/settings.local.json
 .claude/settings.json
+.claude/git-conventions.md
 
 ### Local Dev Docs ###
 TASKS.md
