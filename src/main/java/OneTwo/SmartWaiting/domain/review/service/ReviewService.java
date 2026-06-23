@@ -62,7 +62,9 @@ public class ReviewService {
                 .imageUrls(request.imageUrls())
                 .build();
 
-        return reviewRepository.save(review).getId();
+        long reviewId = reviewRepository.save(review).getId();
+        waiting.getStore().updateRatingOnCreate(request.rating());
+        return reviewId;
     }
 
     // 2. 가게별 리뷰 조회
@@ -84,6 +86,7 @@ public class ReviewService {
             throw new BusinessException(ErrorCode.NOT_YOUR_REVIEW);
         }
 
+        review.getStore().updateRatingOnDelete(review.getRating());
         reviewRepository.delete(review);
     }
 

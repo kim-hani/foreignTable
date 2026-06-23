@@ -74,6 +74,7 @@ class ReviewServiceTest {
         // then
         assertThat(resultId).isEqualTo(100L);
         verify(reviewRepository, times(1)).save(any(Review.class));
+        verify(mockStore, times(1)).updateRatingOnCreate(5);
     }
 
     @Test
@@ -218,6 +219,7 @@ class ReviewServiceTest {
         // then
         assertThat(resultId).isEqualTo(100L);
         verify(reviewRepository, times(1)).save(any(Review.class));
+        verify(mockStore, times(1)).updateRatingOnCreate(5);
     }
 
     // ================= [ 가게별 리뷰 조회 (Read) ] =================
@@ -290,6 +292,7 @@ class ReviewServiceTest {
         reviewService.deleteReview(reviewId, email);
 
         // then
+        verify(mockStore, times(1)).updateRatingOnDelete(5);
         verify(reviewRepository, times(1)).delete(mockReview);
     }
 

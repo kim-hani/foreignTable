@@ -19,7 +19,9 @@ public record StoreResponseDto(
         List<MenuItemVo> menuItems,
         Map<String,List<HourlyStatVo>> weeklyWaitingStats,
         Boolean isAcceptingWaiting,
-        Integer maxWaitingCount
+        Integer maxWaitingCount,
+        Double averageRating,
+        Integer reviewCount
 ) {
     public static StoreResponseDto from(Store store) {
         return new StoreResponseDto(
@@ -33,7 +35,9 @@ public record StoreResponseDto(
                 store.getMenuItems(),
                 store.getWeeklyWaitingStats(),
                 store.getIsAcceptingWaiting(),
-                store.getMaxWaitingCount()
+                store.getMaxWaitingCount(),
+                store.getAverageRating(),
+                store.getReviewCount()
         );
     }
 }
