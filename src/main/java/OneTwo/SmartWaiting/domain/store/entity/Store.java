@@ -43,6 +43,14 @@ public class Store extends BaseEntity {
     @Column
     private Integer maxWaitingCount;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Double averageRating = 0.0;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer reviewCount = 0;
+
     // [PostGis] 위치 정보 매핑
     // SRID 4326 = WGS 84(GPS 좌표계)
     @Column(columnDefinition = "geometry(point, 4326)")
@@ -81,5 +89,22 @@ public class Store extends BaseEntity {
 
     public void updateWaitingAcceptance(boolean isAcceptingWaiting) {
         this.isAcceptingWaiting = isAcceptingWaiting;
+    }
+
+    public void updateRatingOnCreate(int newRating) {
+        this.averageRating = (this.averageRating * this.reviewCount + newRating)
+                             / (this.reviewCount + 1);
+        this.reviewCount++;
+    }
+
+    public void updateRatingOnDelete(int deletedRating) {
+        if (this.reviewCount <= 1) {
+            this.averageRating = 0.0;
+            this.reviewCount = 0;
+        } else {
+            this.averageRating = (this.averageRating * this.reviewCount - deletedRating)
+                                 / (this.reviewCount - 1);
+            this.reviewCount--;
+        }
     }
 }
