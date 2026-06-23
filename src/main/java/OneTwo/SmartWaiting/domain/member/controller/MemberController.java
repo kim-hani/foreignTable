@@ -1,5 +1,6 @@
 package OneTwo.SmartWaiting.domain.member.controller;
 
+import OneTwo.SmartWaiting.domain.member.dto.requestDto.FcmTokenUpdateRequestDto;
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.MemberSignUpRequestDto;
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.MemberUpdateRequestDto;
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.PasswordUpdateRequestDto;
@@ -44,6 +45,15 @@ public class MemberController {
             Principal principal,
             @RequestBody @Valid PasswordUpdateRequestDto request) {
         memberService.updatePassword(principal.getName(), request);
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "FCM 토큰 갱신", description = "앱 재설치 또는 토큰 만료 시 새 FCM 토큰을 저장합니다.")
+    @PatchMapping("/me/fcm-token")
+    public ResponseEntity<Void> updateFcmToken(
+            Principal principal,
+            @RequestBody @Valid FcmTokenUpdateRequestDto request) {
+        memberService.updateFcmToken(principal.getName(), request);
         return ResponseEntity.ok().build();
     }
 

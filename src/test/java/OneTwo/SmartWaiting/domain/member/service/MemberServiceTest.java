@@ -3,6 +3,7 @@ package OneTwo.SmartWaiting.domain.member.service;
 import OneTwo.SmartWaiting.auth.repository.RefreshTokenRepository;
 import OneTwo.SmartWaiting.common.exception.BusinessException;
 import OneTwo.SmartWaiting.common.exception.ErrorCode;
+import OneTwo.SmartWaiting.domain.member.dto.requestDto.FcmTokenUpdateRequestDto;
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.MemberUpdateRequestDto;
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.PasswordUpdateRequestDto;
 import OneTwo.SmartWaiting.domain.member.dto.responseDto.MemberResponseDto;
@@ -154,6 +155,39 @@ class MemberServiceTest {
         BusinessException exception = assertThrows(BusinessException.class, () -> memberService.updatePassword(email, requestDto));
 
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PASSWORD_MISMATCH);
+    }
+
+    @Test
+    @DisplayName("FCM 토큰 갱신 성공")
+    void updateFcmToken_Success() {
+        // given
+        String email = "test@gmail.com";
+        FcmTokenUpdateRequestDto requestDto = new FcmTokenUpdateRequestDto("new-fcm-token-abc");
+        Member mockMember = mock(Member.class);
+
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
+        when(mockMember.getIsDeleted()).thenReturn(false);
+
+        // when
+        memberService.updateFcmToken(email, requestDto);
+
+        // then
+        verify(mockMember, times(1)).updateFcmToken("new-fcm-token-abc");
+    }
+
+    @Test
+    @DisplayName("FCM 토큰 갱신 실패 - 존재하지 않는 회원")
+    void updateFcmToken_Fail_MemberNotFound() {
+        // given
+        String email = "notfound@gmail.com";
+        FcmTokenUpdateRequestDto requestDto = new FcmTokenUpdateRequestDto("new-fcm-token-abc");
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.empty());
+
+        // when & then
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> memberService.updateFcmToken(email, requestDto));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.MEMBER_NOT_FOUND);
     }
 
     @Test

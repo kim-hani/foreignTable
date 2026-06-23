@@ -3,6 +3,7 @@ package OneTwo.SmartWaiting.domain.member.service;
 import OneTwo.SmartWaiting.auth.repository.RefreshTokenRepository;
 import OneTwo.SmartWaiting.common.exception.BusinessException;
 import OneTwo.SmartWaiting.common.exception.ErrorCode;
+import OneTwo.SmartWaiting.domain.member.dto.requestDto.FcmTokenUpdateRequestDto;
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.MemberSignUpRequestDto;
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.MemberUpdateRequestDto;
 import OneTwo.SmartWaiting.domain.member.dto.requestDto.PasswordUpdateRequestDto;
@@ -61,6 +62,12 @@ public class MemberService {
         }
 
         member.updatePassword(passwordEncoder.encode(requestDto.newPassword()));
+    }
+
+    @Transactional
+    public void updateFcmToken(String email, FcmTokenUpdateRequestDto requestDto) {
+        Member member = findMemberByEmailOrThrow(email);
+        member.updateFcmToken(requestDto.fcmToken());
     }
 
     private Member findMemberByIdOrThrow(Long memberId) {
