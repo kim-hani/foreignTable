@@ -95,15 +95,16 @@ jwt:
 admin:
   secret-key: ${ADMIN_SECRET_KEY}
 
+# TODO: S3 인프라 구축 후 docker-compose.yml AWS 항목 주석 해제 + .env에 실제 값 입력
 cloud:
   aws:
     s3:
-      bucket: ${S3_BUCKET_NAME}
+      bucket: ${S3_BUCKET_NAME:local-bucket}
     credentials:
-      access-key: ${AWS_ACCESS_KEY}
-      secret-key: ${AWS_SECRET_KEY}
+      access-key: ${AWS_ACCESS_KEY:local-placeholder}
+      secret-key: ${AWS_SECRET_KEY:local-placeholder}
     region:
-      static: ${AWS_REGION}
+      static: ${AWS_REGION:ap-northeast-2}
 
 springdoc:
   override-with-generic-response: false

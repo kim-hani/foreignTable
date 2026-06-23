@@ -51,3 +51,9 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+
+      # TODO: S3 인프라 구축 후 아래 주석 해제 + .env에 실제 값 입력
+      # AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+      # AWS_SECRET_KEY: ${AWS_SECRET_KEY}
+      # S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      # AWS_REGION: ${AWS_REGION}
