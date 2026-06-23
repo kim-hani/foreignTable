@@ -4,6 +4,7 @@ import OneTwo.SmartWaiting.domain.review.entity.Review;
 import lombok.Builder;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Builder
 public record ReviewResponseDto(
@@ -11,7 +12,8 @@ public record ReviewResponseDto(
         String content,
         int rating,
         String writerNickname,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        List<String> imageUrls
 ) {
     public static ReviewResponseDto from(Review review) {
         return ReviewResponseDto.builder()
@@ -20,6 +22,7 @@ public record ReviewResponseDto(
                 .rating(review.getRating())
                 .writerNickname(review.getMember().getNickname())
                 .createdAt(review.getCreatedAt())
+                .imageUrls(review.getImageUrls())
                 .build();
     }
 }

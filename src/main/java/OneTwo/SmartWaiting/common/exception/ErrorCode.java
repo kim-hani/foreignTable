@@ -50,6 +50,12 @@ public enum ErrorCode {
     FAVORITE_NOT_FOUND(HttpStatus.NOT_FOUND, "F001", "즐겨찾기 내역이 존재하지 않습니다."),
     ALREADY_FAVORITE(HttpStatus.CONFLICT, "F002", "이미 즐겨찾기 한 식당입니다."),
 
+    // ===== 이미지 업로드 (Upload) =====
+    INVALID_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "U001", "지원하지 않는 이미지 형식입니다. (jpg, png, webp만 허용)"),
+    IMAGE_TOO_LARGE(HttpStatus.BAD_REQUEST, "U002", "이미지 파일 크기는 10MB를 초과할 수 없습니다."),
+    TOO_MANY_IMAGES(HttpStatus.BAD_REQUEST, "U003", "이미지는 최대 5장까지 첨부 가능합니다."),
+    IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "U004", "이미지 업로드에 실패했습니다."),
+
     // ===== 기타 (Other) =====
     BLACKLISTED_MEMBER(HttpStatus.FORBIDDEN, "O001", "블랙리스트에 등록된 회원입니다. 이용이 제한됩니다.");
 
