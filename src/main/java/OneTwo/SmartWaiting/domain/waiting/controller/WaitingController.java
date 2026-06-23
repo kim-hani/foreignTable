@@ -3,6 +3,7 @@ package OneTwo.SmartWaiting.domain.waiting.controller;
 import OneTwo.SmartWaiting.domain.waiting.dto.requestDto.WaitingChangeRequestDto;
 import OneTwo.SmartWaiting.domain.waiting.dto.requestDto.WaitingRegisterRequestDto;
 import OneTwo.SmartWaiting.domain.waiting.dto.responseDto.WaitingResponse;
+import OneTwo.SmartWaiting.domain.waiting.dto.responseDto.WaitingStatusResponse;
 import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
 import OneTwo.SmartWaiting.domain.waiting.facade.WaitingLockFacade;
 import OneTwo.SmartWaiting.domain.waiting.service.WaitingService;
@@ -74,6 +75,15 @@ public class WaitingController {
             @RequestBody @Valid WaitingChangeRequestDto request) {
         waitingService.changeStatus(waitingId, request, principal.getName());
         return ResponseEntity.ok().build();
+    }
+
+    // 웨이팅 현황 실시간 단건 조회
+    @Operation(summary = "웨이팅 현황 실시간 조회", description = "손님이 본인 웨이팅의 현재 순번, 앞팀 수, 예상 대기시간을 실시간으로 조회합니다.")
+    @GetMapping("/{waitingId}/status")
+    public ResponseEntity<WaitingStatusResponse> getWaitingStatus(
+            @PathVariable Long waitingId,
+            Principal principal) {
+        return ResponseEntity.ok(waitingService.getWaitingStatus(waitingId, principal.getName()));
     }
 
     @Operation(summary = "웨이팅 미루기", description = "대기 손님이 자신의 웨이팅을 뒤로 미룹니다.")

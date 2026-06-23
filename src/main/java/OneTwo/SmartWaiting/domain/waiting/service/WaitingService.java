@@ -11,6 +11,7 @@ import OneTwo.SmartWaiting.domain.store.repository.StoreRepository;
 import OneTwo.SmartWaiting.domain.waiting.dto.requestDto.WaitingChangeRequestDto;
 import OneTwo.SmartWaiting.domain.waiting.dto.requestDto.WaitingRegisterRequestDto;
 import OneTwo.SmartWaiting.domain.waiting.dto.responseDto.WaitingResponse;
+import OneTwo.SmartWaiting.domain.waiting.dto.responseDto.WaitingStatusResponse;
 import OneTwo.SmartWaiting.domain.waiting.entity.Waiting;
 import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
 import OneTwo.SmartWaiting.domain.waiting.repository.WaitingRepository;
@@ -230,6 +231,36 @@ public class WaitingService {
         if (shouldNotifyFirst) {
             checkAndNotifyFirstInLine(waiting.getStore().getId());
         }
+    }
+
+    public WaitingStatusResponse getWaitingStatus(Long waitingId, String email) {
+        Waiting waiting = waitingRepository.findById(waitingId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.WAITING_NOT_FOUND));
+
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+        if (!waiting.getMember().getId().equals(member.getId())) {
+            throw new BusinessException(ErrorCode.NOT_YOUR_WAITING);
+        }
+
+        long teamsAhead = 0L;
+        int expectedWaitMin = 0;
+
+        if (waiting.getStatus() == WaitingStatus.WAITING || waiting.getStatus() == WaitingStatus.CALL) {
+            teamsAhead = waitingRepository.countByStoreIdAndStatusInAndTicketTimeLessThan(
+                    waiting.getStore().getId(),
+                    Arrays.asList(WaitingStatus.WAITING, WaitingStatus.CALL),
+                    waiting.getTicketTime()
+            );
+            expectedWaitMin = (int) (teamsAhead * waiting.getStore().getAverageWaiting());
+        }
+
+        int currentRank = (waiting.getStatus() == WaitingStatus.WAITING || waiting.getStatus() == WaitingStatus.CALL)
+                ? (int) teamsAhead + 1
+                : 0;
+
+        return new WaitingStatusResponse(waiting.getStatus(), currentRank, teamsAhead, expectedWaitMin);
     }
 
     boolean isTop2(Waiting waiting) {

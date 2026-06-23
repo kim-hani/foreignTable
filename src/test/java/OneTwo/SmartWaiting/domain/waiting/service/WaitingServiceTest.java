@@ -655,6 +655,172 @@ class WaitingServiceTest {
         assertThat(responses.get(0).expectedWaitMin()).isEqualTo(20); // 2팀 * 10분
     }
 
+    // ==================== getWaitingStatus ====================
+
+    @Test
+    @DisplayName("웨이팅 현황 조회 성공 - WAITING 상태이면 currentRank·teamsAhead·expectedWaitMin을 실시간 계산한다")
+    void getWaitingStatus_Success_WaitingStatus() {
+        Long waitingId = 1L;
+        String email = "test@gmail.com";
+
+        Waiting mockWaiting = mock(Waiting.class);
+        Member mockMember = mock(Member.class);
+        Store mockStore = mock(Store.class);
+
+        when(waitingRepository.findById(waitingId)).thenReturn(Optional.of(mockWaiting));
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
+        when(mockWaiting.getMember()).thenReturn(mockMember);
+        when(mockMember.getId()).thenReturn(100L);
+        when(mockWaiting.getStatus()).thenReturn(WaitingStatus.WAITING);
+        when(mockWaiting.getStore()).thenReturn(mockStore);
+        when(mockStore.getId()).thenReturn(1L);
+        when(mockStore.getAverageWaiting()).thenReturn(10);
+        when(waitingRepository.countByStoreIdAndStatusInAndTicketTimeLessThan(any(), any(), any())).thenReturn(2L);
+
+        var result = waitingService.getWaitingStatus(waitingId, email);
+
+        assertThat(result.status()).isEqualTo(WaitingStatus.WAITING);
+        assertThat(result.teamsAhead()).isEqualTo(2L);
+        assertThat(result.currentRank()).isEqualTo(3);   // teamsAhead + 1
+        assertThat(result.expectedWaitMin()).isEqualTo(20); // 2팀 * 10분
+    }
+
+    @Test
+    @DisplayName("웨이팅 현황 조회 성공 - CALL 상태에서도 실시간 순번을 계산한다")
+    void getWaitingStatus_Success_CallStatus() {
+        Long waitingId = 1L;
+        String email = "test@gmail.com";
+
+        Waiting mockWaiting = mock(Waiting.class);
+        Member mockMember = mock(Member.class);
+        Store mockStore = mock(Store.class);
+
+        when(waitingRepository.findById(waitingId)).thenReturn(Optional.of(mockWaiting));
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
+        when(mockWaiting.getMember()).thenReturn(mockMember);
+        when(mockMember.getId()).thenReturn(100L);
+        when(mockWaiting.getStatus()).thenReturn(WaitingStatus.CALL);
+        when(mockWaiting.getStore()).thenReturn(mockStore);
+        when(mockStore.getId()).thenReturn(1L);
+        when(mockStore.getAverageWaiting()).thenReturn(10);
+        when(waitingRepository.countByStoreIdAndStatusInAndTicketTimeLessThan(any(), any(), any())).thenReturn(0L);
+
+        var result = waitingService.getWaitingStatus(waitingId, email);
+
+        assertThat(result.status()).isEqualTo(WaitingStatus.CALL);
+        assertThat(result.teamsAhead()).isEqualTo(0L);
+        assertThat(result.currentRank()).isEqualTo(1);
+        assertThat(result.expectedWaitMin()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("웨이팅 현황 조회 성공 - SEATED 상태이면 rank 관련 필드는 모두 0이다")
+    void getWaitingStatus_Success_SeatedStatus_ReturnsZero() {
+        Long waitingId = 1L;
+        String email = "test@gmail.com";
+
+        Waiting mockWaiting = mock(Waiting.class);
+        Member mockMember = mock(Member.class);
+
+        when(waitingRepository.findById(waitingId)).thenReturn(Optional.of(mockWaiting));
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
+        when(mockWaiting.getMember()).thenReturn(mockMember);
+        when(mockMember.getId()).thenReturn(100L);
+        when(mockWaiting.getStatus()).thenReturn(WaitingStatus.SEATED);
+
+        var result = waitingService.getWaitingStatus(waitingId, email);
+
+        assertThat(result.status()).isEqualTo(WaitingStatus.SEATED);
+        assertThat(result.currentRank()).isEqualTo(0);
+        assertThat(result.teamsAhead()).isEqualTo(0L);
+        assertThat(result.expectedWaitMin()).isEqualTo(0);
+        verify(waitingRepository, never()).countByStoreIdAndStatusInAndTicketTimeLessThan(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("웨이팅 현황 조회 성공 - CANCEL 상태이면 rank 관련 필드는 모두 0이다")
+    void getWaitingStatus_Success_CancelStatus_ReturnsZero() {
+        Long waitingId = 1L;
+        String email = "test@gmail.com";
+
+        Waiting mockWaiting = mock(Waiting.class);
+        Member mockMember = mock(Member.class);
+
+        when(waitingRepository.findById(waitingId)).thenReturn(Optional.of(mockWaiting));
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
+        when(mockWaiting.getMember()).thenReturn(mockMember);
+        when(mockMember.getId()).thenReturn(100L);
+        when(mockWaiting.getStatus()).thenReturn(WaitingStatus.CANCEL);
+
+        var result = waitingService.getWaitingStatus(waitingId, email);
+
+        assertThat(result.status()).isEqualTo(WaitingStatus.CANCEL);
+        assertThat(result.currentRank()).isEqualTo(0);
+        assertThat(result.teamsAhead()).isEqualTo(0L);
+        assertThat(result.expectedWaitMin()).isEqualTo(0);
+        verify(waitingRepository, never()).countByStoreIdAndStatusInAndTicketTimeLessThan(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("웨이팅 현황 조회 성공 - NOSHOW 상태이면 rank 관련 필드는 모두 0이다")
+    void getWaitingStatus_Success_NoShowStatus_ReturnsZero() {
+        Long waitingId = 1L;
+        String email = "test@gmail.com";
+
+        Waiting mockWaiting = mock(Waiting.class);
+        Member mockMember = mock(Member.class);
+
+        when(waitingRepository.findById(waitingId)).thenReturn(Optional.of(mockWaiting));
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
+        when(mockWaiting.getMember()).thenReturn(mockMember);
+        when(mockMember.getId()).thenReturn(100L);
+        when(mockWaiting.getStatus()).thenReturn(WaitingStatus.NOSHOW);
+
+        var result = waitingService.getWaitingStatus(waitingId, email);
+
+        assertThat(result.status()).isEqualTo(WaitingStatus.NOSHOW);
+        assertThat(result.currentRank()).isEqualTo(0);
+        assertThat(result.teamsAhead()).isEqualTo(0L);
+        assertThat(result.expectedWaitMin()).isEqualTo(0);
+        verify(waitingRepository, never()).countByStoreIdAndStatusInAndTicketTimeLessThan(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("웨이팅 현황 조회 실패 - 존재하지 않는 waitingId이면 WAITING_NOT_FOUND 예외 발생")
+    void getWaitingStatus_Fail_WaitingNotFound() {
+        Long waitingId = 99L;
+        String email = "test@gmail.com";
+
+        when(waitingRepository.findById(waitingId)).thenReturn(Optional.empty());
+
+        BusinessException exception = Assertions.assertThrows(BusinessException.class,
+                () -> waitingService.getWaitingStatus(waitingId, email));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.WAITING_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("웨이팅 현황 조회 실패 - 타인의 waitingId 접근 시 NOT_YOUR_WAITING 예외 발생")
+    void getWaitingStatus_Fail_NotYourWaiting() {
+        Long waitingId = 1L;
+        String email = "hacker@gmail.com";
+
+        Waiting mockWaiting = mock(Waiting.class);
+        Member owner = mock(Member.class);
+        Member hacker = mock(Member.class);
+
+        when(waitingRepository.findById(waitingId)).thenReturn(Optional.of(mockWaiting));
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(hacker));
+        when(mockWaiting.getMember()).thenReturn(owner);
+        when(owner.getId()).thenReturn(100L);
+        when(hacker.getId()).thenReturn(999L);
+
+        BusinessException exception = Assertions.assertThrows(BusinessException.class,
+                () -> waitingService.getWaitingStatus(waitingId, email));
+
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.NOT_YOUR_WAITING);
+    }
+
     // ==================== getStoreWaitings ====================
 
     @Test
