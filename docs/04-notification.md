@@ -25,6 +25,15 @@ SmartWaiting은 **상황에 맞는 두 가지 알림 채널**을 사용합니다
 - FCM은 앱이 꺼져 있어도 도달하지만 **외부 인프라 의존**
 - → "입장 직전" 같은 중요 알림은 **SSE + FCM 동시 발송**으로 도달률 극대화
 
+> ⚠️ **현재 채널 매핑 현황 (개선 예정)**
+> | 알림 | 현재 채널 | 브라우저 꺼진 상태 |
+> |---|---|---|
+> | 입장 직전(새 1번째) | SSE + FCM | ✅ 도달 |
+> | 사장님 호출(CALL) | **SSE 전용** | ❌ 미도달 |
+> | 3번째 순번 | SSE 전용 | ❌ 미도달 |
+>
+> 사장님 호출은 가장 중요한 알림이지만 현재 SSE 전용이라 브라우저를 끄면 받지 못함. → **§8 개선 로드맵**에서 FCM 발송을 추가해 보완할 예정.
+
 ---
 
 ## 2. SSE 실시간 알림 — NotificationService
@@ -100,7 +109,9 @@ public void closeConnection(Long memberId) {  // 종료 상태(착석/취소/노
 - 종료 상태 도달 → `closeConnection()`으로 명시적 정리
 - 타임아웃/완료 콜백 → 자동 제거
 
-> ⚠️ **현재 한계**: `ConcurrentHashMap`은 **단일 인스턴스 메모리**에만 존재. 서버를 여러 대로 확장하면 다른 인스턴스에 연결된 사용자에게 알림이 안 감. → Redis Pub/Sub 기반 확장이 향후 과제.
+> ⚠️ **현재 한계 1 (스케일 아웃)**: `ConcurrentHashMap`은 **단일 인스턴스 메모리**에만 존재. 서버를 여러 대로 확장하면 다른 인스턴스에 연결된 사용자에게 알림이 안 감. → Redis Pub/Sub 기반 확장이 향후 과제.
+
+> ⚠️ **현재 한계 2 (연결 유지)**: `SseEmitter` 타임아웃은 60분이지만 **Heartbeat(주기적 핑)가 없음**. nginx·ALB·모바일 네트워크의 idle timeout(통상 60초)이 먼저 연결을 끊을 수 있고, 재연결·유실 복구 메커니즘도 없음. → **§8 개선 로드맵** 참조.
 
 ---
 
@@ -306,3 +317,91 @@ public void sendReviewRequestNotifications() {
 | `/api/v1/notifications/subscribe/{memberId}` | GET (SSE) | 실시간 알림 구독 연결 |
 
 > 나머지 알림은 웨이팅 상태 변경·스케줄러에서 **자동 발송**되며 별도 API가 없음.
+
+---
+
+## 8. 알림 안정성 개선 로드맵 (예정)
+
+> 프로젝트를 **웹 브라우저** 기준으로 운용한다는 가정 하에, §1·§2의 한계를 보완하기 위한 계획.
+> 백엔드는 **SSE Heartbeat 추가 + 호출(CALL) FCM 발송**만 하면 되고, 나머지는 프론트엔드(Service Worker·EventSource) 몫. (태스크: `TASKS.md` Phase 6~7 #30~#34)
+
+### 8.1 목표
+
+| 상황 | 현재 | 개선 후 |
+|---|---|---|
+| 브라우저 켜짐, 연결 중 | ✅ 수신 | ✅ |
+| 브라우저 켜짐, idle로 연결 끊김 | ❌ 유실 | ✅ Heartbeat로 방지 |
+| 브라우저 켜짐, 장시간 후 만료 | ❌ 유실 | ✅ EventSource 자동 재연결 |
+| 브라우저 꺼짐, 호출(CALL) | ❌ 유실 | ✅ FCM Web Push |
+
+### 8.2 SSE 연결 유지 — Heartbeat (#30, 백엔드)
+
+브라우저를 **켜 둔 동안에는 SSE가 끊기지 않도록** 주기적으로 빈 이벤트를 보내 중간 인프라의 idle timeout을 회피한다.
+
+```java
+// NotificationService에 추가 (@EnableScheduling은 기존 스케줄러로 활성화됨)
+@Scheduled(fixedDelay = 25000)   // 25초 — nginx/ALB 60초 idle보다 짧게
+public void sendHeartbeat() {
+    emitters.forEach((memberId, emitter) -> {
+        try {
+            emitter.send(SseEmitter.event().comment("heartbeat"));  // 주석 이벤트(클라이언트엔 안 보임)
+        } catch (IOException e) {
+            emitters.remove(memberId);   // 죽은 연결 정리 (기존 sendToClient와 동일 패턴)
+        }
+    });
+}
+```
+
+> **역할 분담:** 연결 *유지*는 백엔드 Heartbeat가, 끊겼을 때의 *재연결*은 브라우저 `EventSource`의 기본 자동 재연결(약 3초 간격)이 담당. 즉 백엔드에 Heartbeat만 추가하면 프론트는 별도 재연결 코드 없이도 "켜둔 동안 유지"가 동작한다. (프론트 작업 #34)
+>
+> **AWS 메모:** ALB(#24) 적용 시 SSE 경로 idle timeout을 300s 이상으로 설정해야 함.
+
+### 8.3 브라우저 꺼진 상태 호출 알림 — FCM Web Push (#31 + #33)
+
+`FirebaseMessaging.send()`는 **웹 FCM 토큰도 모바일과 동일하게 처리**하므로, 기존 `FcmService` 구조를 그대로 재사용할 수 있다. 백엔드 변경은 최소다.
+
+```
+[백엔드] CALL 상태 변경
+   ├─ SSE 전송 (브라우저 켜진 경우 즉시)
+   └─ FCM 전송 (브라우저 꺼진 경우도 도달)
+        → FCM 서버 → 브라우저 Push Service
+            → Service Worker(onBackgroundMessage) 깨어남
+                → OS 레벨 알림 표시 ✅
+```
+
+**백엔드 (#31)** — `FcmService`에 메서드 1개 + `WaitingService` 한 줄:
+
+```java
+// FcmService — sendFirstInLinePush 패턴 그대로
+public void sendCallPush(String targetToken, Long storeId) {
+    if (targetToken == null || targetToken.isEmpty()) return;
+    Message message = Message.builder()
+        .setToken(targetToken)
+        .setNotification(Notification.builder()
+            .setTitle("입장 호출 알림")
+            .setBody("📢 사장님이 호출하셨습니다! 매장으로 입장해 주세요.")
+            .build())
+        .putData("type", "CALL")
+        .putData("storeId", String.valueOf(storeId))
+        .build();
+    FirebaseMessaging.getInstance().send(message);
+}
+```
+
+```java
+// WaitingService.changeStatus() — case CALL: 에 한 줄 추가
+case CALL:
+    notificationService.sendToClient(waiting.getMember().getId(), "📢 사장님이 호출하셨습니다! 매장으로 입장해 주세요.");
+    fcmService.sendCallPush(waiting.getMember().getFcmToken(), waiting.getStore().getId());  // 추가
+    break;
+```
+
+**프론트엔드 (#33)** — Service Worker + 토큰 등록:
+- `public/firebase-messaging-sw.js`에서 `onBackgroundMessage` → `showNotification`
+- 알림 권한 요청 → `getToken(messaging, { vapidKey })`로 웹 토큰 발급
+- 발급 토큰을 **이미 구현된** `PATCH /api/v1/members/me/fcm-token`으로 저장
+- 알림 클릭 시 `data.type`(CALL/FIRST_IN_LINE/REVIEW_REQUEST) + `storeId`로 딥링크 이동
+
+### 8.4 웹+앱 동시 운용 시 주의 (Phase 8 연계)
+
+현재 `Member.fcmToken`은 **단일 필드**라, 같은 계정으로 웹·앱을 함께 쓰면 나중에 로그인한 기기 토큰이 이전 것을 덮어써 한쪽 알림이 끊긴다. 앱 전환(웹+앱 동시 운용) 시 **기기별 다중 토큰 구조**로 확장해야 한다. (태스크 #36)

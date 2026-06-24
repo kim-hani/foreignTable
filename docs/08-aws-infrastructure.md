@@ -56,6 +56,44 @@
 
 ---
 
+## 1-1. 전체 요청 흐름 (End-to-End) — 클라이언트 요청부터 응답까지
+
+인프라 각 부품을 보기 전에, **사용자의 요청 하나가 위 그림을 어떻게 관통하는지** 먼저 따라가 보겠습니다. 시나리오는 손님의 웨이팅 등록입니다.
+
+```
+① 도메인 입력      사용자가 smartwaiting.com 접속
+                        │
+② DNS 조회        Route 53이 도메인 → ALB 주소 반환
+                        │
+③ HTTPS 연결      ACM 인증서로 TLS 암호화된 443 요청이 ALB에 도착
+                        │
+④ 트래픽 전달      ALB가 TLS를 풀고 EC2:8080(HTTP)으로 전달 (App SG가 ALB만 허용)
+                        │
+⑤ 인증            EC2의 Spring Boot: JwtAuthenticationFilter가 토큰 검증 → SecurityContext
+                        │
+⑥ 분산락          WaitingLockFacade → ElastiCache(Redis)에 가게 단위 락 요청 (Cache SG가 App만 허용)
+                        │
+⑦ 비즈니스·저장   락 안에서 WaitingService → RDS(PostgreSQL+PostGIS)에 검증·저장 (DB SG가 App만 허용)
+                        │
+⑧ 실시간 알림      순번 변동 시 SSE 발송 (ALB idle timeout 300s+ 로 장기 연결 유지)
+                        │
+⑨ 외부 푸시        1번째 변동 등 FCM 필요 시 EC2 → NAT Gateway → 인터넷(Firebase)
+                        │
+⑩ 응답            결과가 EC2 → ALB → 사용자로 반환, 락 해제
+```
+
+**흐름 설명**: 요청은 **공개 영역에서 점점 더 깊은 사설 영역으로** 들어갔다가 같은 길로 빠져나옵니다.
+
+- **②~③ 진입**: 사용자가 도메인을 입력하면 Route 53이 이를 ALB 주소로 바꿔주고, 연결은 ACM 인증서로 암호화되어 ALB의 443 포트에 닿습니다. 여기까지가 "인터넷에서 보이는" 구간입니다.
+- **④ 관문 통과**: ALB가 HTTPS를 종료(복호화)하고 내부 EC2의 8080으로 평문 전달합니다. 이때 App 보안그룹이 "ALB에서 온 트래픽만" 허용하므로, 외부에서 EC2로 직접 들어오는 길은 막혀 있습니다.
+- **⑤~⑦ 처리**: EC2의 애플리케이션이 토큰으로 사용자를 확인하고, 동시성이 필요한 등록이므로 **Private에 있는 Redis(ElastiCache)에 락을 잡은 뒤** Private의 DB(RDS)에 저장합니다. 데이터 계층은 Public에서 보이지 않고 오직 앱 서버를 통해서만 접근됩니다(보안그룹 체이닝, §3).
+- **⑧~⑨ 알림**: 순번이 바뀌면 웹에는 SSE로 즉시 보내고(ALB가 장기 연결을 끊지 않도록 idle timeout을 늘려둠), 앱 푸시가 필요하면 EC2가 NAT Gateway를 통해 외부 FCM으로 나갑니다. **들어오는 길(인터넷→ALB)과 나가는 길(EC2→NAT)이 분리**돼 있는 것이 포인트입니다.
+- **⑩ 반환**: 응답은 들어온 길을 거슬러 ALB를 거쳐 사용자에게 돌아가고, 락은 그 전에 해제됩니다.
+
+> 이 한 줄기 흐름에 등장한 모든 부품(VPC·서브넷·보안그룹·ALB·EC2·RDS·ElastiCache·NAT·S3)을 아래 §2부터 하나씩, **각 부품 안에서 무슨 일이 일어나는지** 설명합니다.
+
+---
+
 ## 2. VPC와 서브넷 — 인프라의 토대
 
 ### 2.1 VPC란?
@@ -104,6 +142,8 @@ EC2(Private) ──▶ NAT Gateway(Public) ──▶ Internet Gateway ──▶ 
               나가는 요청만 허용 (외부에서 먼저 들어오는 연결은 차단)
 ```
 
+**내부에서 일어나는 일**: NAT Gateway는 Private 자원이 외부로 나갈 때 **출발지 IP를 자신의 공인 IP로 바꿔치기(주소 변환)**합니다. 그래서 응답은 NAT를 거쳐 다시 EC2로 돌아올 수 있지만, **외부가 먼저 EC2에 연결을 시도하는 것은 불가능**합니다(나가는 연결에 대한 응답만 통과). EC2가 ECR에서 이미지를 받거나 Gemini·FCM API를 호출하는 트래픽이 모두 이 길을 탑니다. 단, S3처럼 자주·대량으로 접근하는 AWS 서비스는 NAT 대신 VPC Endpoint로 빼면 NAT 통과 비용을 아낄 수 있습니다(§7).
+
 ---
 
 ## 3. 보안 그룹 — 가상 방화벽
@@ -134,6 +174,8 @@ DB SG 인바운드 = "App SG에서 오는 5432 트래픽만 허용"
 
 이렇게 하면 **계단식 접근 제어**가 완성됩니다: 인터넷 → ALB → 앱 → DB/Redis 순으로만 통과 가능.
 
+**내부에서 일어나는 일**: 보안 그룹은 각 리소스의 네트워크 카드 앞에 붙는 **상태 기반(stateful) 방화벽**입니다. "허용"한 인바운드에 대한 응답(아웃바운드)은 규칙을 따로 열지 않아도 자동으로 통과합니다. 핵심은 인바운드 출발지를 **IP가 아니라 다른 보안 그룹으로 지정**한다는 점입니다 — 예컨대 DB SG는 "App SG를 단 자원에서 온 5432만 허용"이라고 적습니다. 그러면 앱 서버를 늘리거나 IP가 바뀌어도 규칙을 고칠 필요가 없고, App SG에 속하지 않은 그 무엇도(다른 서버·외부 IP) DB에 닿을 수 없습니다. 이 참조가 겹겹이 이어져 "인터넷→ALB→App→DB/Cache"라는 한 방향 통로만 남습니다.
+
 ---
 
 ## 4. 컴퓨팅 & 배포 — EC2 + ECR
@@ -153,6 +195,8 @@ EC2 ──docker pull──────────────◀─┘  (IAM R
 | 리포지토리명 | `smart-waiting-app` |
 | 이미지 태그 | `latest` + 커밋 SHA ([07-cicd](./07-cicd.md) §6) |
 | 인증 | EC2의 IAM Role에 ECR pull 권한 부여 (키 불필요) |
+
+**내부에서 일어나는 일**: ECR은 이미지를 **레이어 단위로 저장**해, 바뀐 레이어만 새로 올리고 받습니다(빌드·배포가 빨라짐). 인증은 토큰 기반인데, GitHub Actions는 AWS 자격증명으로, EC2는 IAM Role로 각각 임시 토큰을 발급받아 push/pull합니다 — 즉 **장기 비밀번호를 서버에 두지 않습니다**. 같은 이미지에 `latest`와 커밋 SHA 두 태그가 붙으므로, 평소엔 latest를 받고 문제가 생기면 특정 SHA 태그로 되돌릴 수 있습니다.
 
 ### 4.2 EC2 — 애플리케이션 서버
 
@@ -180,6 +224,8 @@ Spring Boot 앱을 Docker 컨테이너로 실행하는 가상 서버.
 ```
 
 > EC2의 앱은 `docker-compose.yml`에서 DB·Redis 접속 정보를 **RDS·ElastiCache 엔드포인트**로 설정 (로컬 compose의 `db`/`redis` 컨테이너 대신).
+
+**내부에서 일어나는 일**: EC2는 **상태를 갖지 않는(stateless) 실행 환경**입니다. 부팅 시 IAM Role로 ECR에 인증해(별도 키 파일 없이 임시 자격증명을 자동 발급받음) 최신 이미지를 `docker pull`하고, 컨테이너를 띄우면 그 안의 Spring Boot가 RDS·ElastiCache 엔드포인트로 연결을 맺습니다. 데이터는 전부 RDS·ElastiCache·S3에 있으므로, **EC2 자체는 언제든 교체·증설해도 무방**합니다 — 이 무상태성이 ALB를 통한 다중화(EC2를 여러 대로 늘려 부하 분산)를 가능하게 합니다. 배포는 ECR에서 새 이미지를 받아 컨테이너만 갈아끼우는 방식이라, 서버를 재설치할 일이 없습니다.
 
 ---
 
@@ -221,6 +267,8 @@ EC2 죽으면 DB도 죽음                  EC2와 독립적으로 생존
 
 > ⚠️ **분산락 주의**: SmartWaiting의 웨이팅 등록은 Redisson 분산락에 의존하므로, ElastiCache 연결이 끊기면 등록이 막힙니다. 안정성을 위해 Redis도 이중화(Replication) 고려.
 
+**내부에서 일어나는 일**: 운영에서 DB·Redis를 EC2 밖으로 빼는 이유는 **생명주기를 분리**하기 위함입니다. RDS는 자동 백업·스냅샷·장애 시 대기 인스턴스로의 자동 전환(Multi-AZ)·마이너 버전 패치를 AWS가 대신 처리하고, ElastiCache도 노드 관리·복제를 맡아줍니다. 덕분에 앱 서버(EC2)를 재배포·교체해도 데이터는 영향받지 않습니다. 한 가지 운영 필수 작업은 RDS 생성 직후 **`CREATE EXTENSION postgis;`로 PostGIS를 켜는 것**입니다 — 이게 없으면 반경 검색(`ST_DWithin`) 쿼리가 실패합니다. ElastiCache는 분산락·RefreshToken·AI 캐시 세 역할을 모두 담당하므로, 이 노드가 단일 장애점이 되지 않도록 복제 구성을 권장합니다.
+
 ---
 
 ## 6. 네트워크 진입점 — ALB + Route53 + ACM
@@ -242,6 +290,8 @@ EC2 죽으면 DB도 죽음                  EC2와 독립적으로 생존
 | 보안 | EC2는 ALB SG에서만 접근 허용 → 직접 노출 차단 |
 
 > ⚠️ **SSE 주의사항**: SmartWaiting은 SSE(`/api/v1/notifications/subscribe`)로 장시간 연결을 유지합니다. ALB의 **idle timeout을 300초 이상**으로 늘려야 알림 연결이 중간에 끊기지 않습니다. ([04-notification](./04-notification.md))
+
+**내부에서 일어나는 일**: ALB는 **HTTPS 종단점**이자 **트래픽 분배기**입니다. 사용자와는 ACM 인증서로 암호화된 443 연결을 맺어 여기서 복호화(TLS termination)하고, 뒷단 EC2에는 가벼운 평문 8080으로 넘깁니다 — 덕분에 EC2는 인증서 관리 부담 없이 비즈니스 로직에만 집중합니다. 동시에 ALB는 등록된 EC2들에 **헬스 체크**를 보내 정상인 인스턴스에만 트래픽을 분배하고, 비정상 인스턴스는 자동으로 제외합니다. 그래서 EC2를 여러 대로 늘리면 별도 작업 없이 부하가 분산됩니다. 단 SSE는 한 연결을 길게 유지하는 특성이 있어, ALB가 "유휴 연결"로 오인해 끊지 않도록 idle timeout을 늘려야 합니다.
 
 ### 6.2 ACM (Certificate Manager)
 무료 SSL/TLS 인증서를 발급·자동 갱신. ALB에 연결해 HTTPS를 제공합니다.
@@ -288,6 +338,8 @@ https://{bucket}.s3.ap-northeast-2.amazonaws.com/reviews/...
 | 권한 | EC2 IAM Role에 S3 put/get 권한 (또는 IAM 키) |
 | 정책 | 이미지 읽기는 공개, 쓰기는 앱만 |
 
+**내부에서 일어나는 일**: 이미지 같은 정적 파일을 DB나 서버 디스크에 두지 않고 S3에 두는 이유는 **용량 무제한·고내구성**과 **앱 서버 무상태화** 때문입니다. 앱은 업로드 시 형식·크기를 검증한 뒤 AWS SDK로 S3에 `putObject`만 하고, 저장된 객체의 URL을 DB(`Review.imageUrls`)에 기록합니다. 조회 시에는 그 URL로 브라우저가 S3에서 직접 이미지를 받으므로 앱 서버는 이미지 트래픽을 거치지 않습니다. 쓰기는 앱(IAM 권한)만, 읽기는 공개로 두는 정책이 일반적입니다.
+
 > S3는 VPC 밖의 AWS 서비스. EC2(Private)에서 접근 시 NAT Gateway를 거치거나 **VPC Endpoint(S3 Gateway Endpoint)**를 두면 NAT 비용 없이 직접 연결 가능.
 
 ---
@@ -321,6 +373,8 @@ SmartWaiting 특성상 아래 지표가 중요합니다.
 | API P99 응답시간 | 사용자 체감 성능 |
 | SSE 활성 연결 수 | 실시간 알림 부하 ([04](./04-notification.md)) |
 
+**내부에서 일어나는 일**: 세 컴포넌트는 **"노출 → 수집 → 시각화"** 역할을 나눠 맡습니다. Spring Actuator + Micrometer가 JVM·HTTP·커스텀 지표를 `/actuator/prometheus` 한 경로에 텍스트로 노출하면, Prometheus가 이를 **주기적으로 끌어와(pull)** 시계열 DB에 쌓습니다(앱이 밀어 보내는 게 아니라 Prometheus가 긁어가는 방식). Grafana는 그 시계열을 질의해 대시보드로 그리고, 값이 임계치를 넘으면 Slack·이메일로 알립니다. SmartWaiting에서는 특히 **분산락 대기 시간**(락 경합으로 등록이 지연되는지)과 **Redis 캐시 히트율**(AI 요약 캐시 효율)이 서비스 특성상 핵심 관찰 지표입니다.
+
 > 모니터링 서버는 별도 EC2 또는 앱 서버에 Docker Compose로 구성. Prometheus가 `http://앱서버:8080/actuator/prometheus`를 스크래핑.
 
 ---
@@ -347,19 +401,14 @@ DB 비밀번호·JWT 시크릿·OAuth 키·Firebase JSON 등 모든 비밀값을
 
 ## 10. 전체 요청 흐름 (End-to-End)
 
-**시나리오**: 사용자가 웨이팅을 등록하는 전체 경로
+> 이 문서 맨 앞 **[§1-1 전체 요청 흐름](#1-1-전체-요청-흐름-end-to-end--클라이언트-요청부터-응답까지)**에서 클라이언트 요청부터 응답까지의 전 구간을 상세히 다뤘습니다. 요약하면 다음과 같습니다.
 
 ```
-① 사용자 → smartwaiting.com (Route 53가 ALB IP 반환)
-② HTTPS 요청 → ACM 인증서로 암호화 → ALB
-③ ALB → EC2(App):8080 으로 전달 (App SG가 ALB만 허용)
-④ JWT 인증 필터 통과 → WaitingController
-⑤ WaitingLockFacade → ElastiCache(Redis)에 분산락 요청 (Cache SG가 App만 허용)
-⑥ 락 안에서 WaitingService → RDS(PostgreSQL)에 저장 (DB SG가 App만 허용)
-⑦ 순번 3번째면 → NotificationService SSE 알림 (ALB idle timeout 300s+)
-⑧ 1번째 변동 시 → FCM(외부) 푸시 (EC2 → NAT Gateway → 인터넷)
-⑨ 응답 → ALB → 사용자
+사용자 → Route53(DNS) → ACM/ALB(HTTPS 종료) → EC2(인증·비즈니스)
+       → ElastiCache(분산락) → RDS(저장) → SSE/FCM(알림) → 응답
 ```
+
+각 구간에서 어떤 보안그룹이 트래픽을 걸러내고 무슨 일이 일어나는지는 §1-1의 흐름 설명을 참고하세요.
 
 ---
 
