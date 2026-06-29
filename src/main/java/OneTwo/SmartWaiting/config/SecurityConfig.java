@@ -40,6 +40,7 @@ public class SecurityConfig {
                         .requestMatchers("/", "/login/**", "/oauth2/**", "/error").permitAll() // 로그인 관련 페이지 허용
                         .requestMatchers("/api/v1/auth/**").permitAll()
 
+                        .requestMatchers(HttpMethod.GET, "/api/v1/stores/*/analytics").hasRole("OWNER")
                         .requestMatchers(HttpMethod.GET,"/api/v1/stores/**").permitAll()
 
                         .requestMatchers(HttpMethod.POST, "/api/v1/stores").hasRole("OWNER")

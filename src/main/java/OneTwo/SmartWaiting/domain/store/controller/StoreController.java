@@ -3,7 +3,9 @@ package OneTwo.SmartWaiting.domain.store.controller;
 import OneTwo.SmartWaiting.domain.store.dto.requestDto.StoreCreateRequestDto;
 import OneTwo.SmartWaiting.domain.store.dto.requestDto.StoreUpdateRequestDto;
 import OneTwo.SmartWaiting.domain.store.dto.requestDto.WaitingStatusUpdateRequestDto;
+import OneTwo.SmartWaiting.domain.store.dto.responseDto.StoreAnalyticsResponse;
 import OneTwo.SmartWaiting.domain.store.dto.responseDto.StoreResponseDto;
+import OneTwo.SmartWaiting.domain.store.service.StoreAnalyticsService;
 import OneTwo.SmartWaiting.domain.store.service.StoreService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,6 +28,7 @@ import java.util.List;
 public class StoreController {
 
     private final StoreService storeService;
+    private final StoreAnalyticsService storeAnalyticsService;
 
     // 1. 식당 등록
     @Operation(summary = "식당 등록", description = "사장님(OWNER) 권한으로 새로운 식당을 등록합니다.")
@@ -82,6 +85,15 @@ public class StoreController {
             @RequestBody @Valid WaitingStatusUpdateRequestDto request) {
         storeService.updateWaitingStatus(storeId, principal.getName(), request.isAcceptingWaiting());
         return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "영업 분석 대시보드", description = "사장님(OWNER)이 본인 가게의 기간별 웨이팅 운영 지표(총 대기 수, 평균 대기 시간, 노쇼율, 혼잡 시간대 TOP 3, 인원별 분포)를 조회합니다.")
+    @GetMapping("/{storeId}/analytics")
+    public ResponseEntity<StoreAnalyticsResponse> getAnalytics(
+            @PathVariable Long storeId,
+            @RequestParam(defaultValue = "7") int days,
+            Principal principal) {
+        return ResponseEntity.ok(storeAnalyticsService.getAnalytics(storeId, principal.getName(), days));
     }
 
     @Operation(summary = "식당 검색", description = "식당 이름 혹은 카테고리로 식당 목록을 검색합니다.")
