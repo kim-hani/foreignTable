@@ -54,4 +54,32 @@ public interface WaitingRepository extends JpaRepository<Waiting, Long> {
             "GROUP BY EXTRACT(ISODOW FROM ticket_time), EXTRACT(HOUR FROM ticket_time)",
             nativeQuery = true)
     List<WaitingStatProjection> findWaitingStatsByStoreId(@Param("storeId") Long storeId, @Param("oneMonthAgo") LocalDateTime oneMonthAgo);
+
+    // ===== 영업 분석 대시보드(#10) 집계 쿼리 =====
+
+    // 기간 내 상태별 등록 건수 (총 건수 + 노쇼율 계산에 사용)
+    @Query("SELECT w.status, COUNT(w) FROM Waiting w " +
+            "WHERE w.store.id = :storeId AND w.createdAt >= :since GROUP BY w.status")
+    List<Object[]> findStatusCountsSince(@Param("storeId") Long storeId, @Param("since") LocalDateTime since);
+
+    // 기간 내 SEATED 평균 대기 시간(분): 발권(ticket_time) → 착석(updated_at)
+    @Query(value = "SELECT AVG(EXTRACT(EPOCH FROM (updated_at - ticket_time)) / 60) " +
+            "FROM waiting " +
+            "WHERE store_id = :storeId AND status = 'SEATED' AND created_at >= :since",
+            nativeQuery = true)
+    Double findAverageWaitMinutesSince(@Param("storeId") Long storeId, @Param("since") LocalDateTime since);
+
+    // 기간 내 혼잡 TOP 3 시간대 (등록 건수 내림차순)
+    @Query(value = "SELECT CAST(EXTRACT(HOUR FROM created_at) AS INTEGER) AS hour, COUNT(*) AS cnt " +
+            "FROM waiting " +
+            "WHERE store_id = :storeId AND created_at >= :since " +
+            "GROUP BY EXTRACT(HOUR FROM created_at) ORDER BY cnt DESC LIMIT 3",
+            nativeQuery = true)
+    List<Object[]> findTop3BusyHoursSince(@Param("storeId") Long storeId, @Param("since") LocalDateTime since);
+
+    // 기간 내 인원수별 등록 건수 분포
+    @Query("SELECT w.headCount, COUNT(w) FROM Waiting w " +
+            "WHERE w.store.id = :storeId AND w.createdAt >= :since " +
+            "GROUP BY w.headCount ORDER BY w.headCount")
+    List<Object[]> findHeadCountDistributionSince(@Param("storeId") Long storeId, @Param("since") LocalDateTime since);
 }
