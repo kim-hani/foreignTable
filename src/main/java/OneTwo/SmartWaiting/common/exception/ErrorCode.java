@@ -56,6 +56,9 @@ public enum ErrorCode {
     TOO_MANY_IMAGES(HttpStatus.BAD_REQUEST, "U003", "이미지는 최대 5장까지 첨부 가능합니다."),
     IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "U004", "이미지 업로드에 실패했습니다."),
 
+    // ===== 고객지원 (Support) =====
+    SUPPORT_MANUAL_NOT_FOUND(HttpStatus.NOT_FOUND, "CS001", "고객지원 매뉴얼을 찾을 수 없습니다."),
+
     // ===== 기타 (Other) =====
     BLACKLISTED_MEMBER(HttpStatus.FORBIDDEN, "O001", "블랙리스트에 등록된 회원입니다. 이용이 제한됩니다.");
 

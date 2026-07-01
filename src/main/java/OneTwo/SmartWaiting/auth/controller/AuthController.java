@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.security.Principal;
 
-@Tag(name = "1. 인증(Auth) API", description = "회원가입, 로그인, 토큰 재발급, 로그아웃 기능")
+@Tag(name = "01. 인증(Auth) API", description = "회원가입, 로그인, 토큰 재발급, 로그아웃 기능")
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor

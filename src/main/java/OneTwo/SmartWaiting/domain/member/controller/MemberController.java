@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.security.Principal;
 
-@Tag(name = "2. 회원(Member) API", description = "회원 정보 조회, 수정, 탈퇴 기능")
+@Tag(name = "02. 회원(Member) API", description = "회원 정보 조회, 수정, 탈퇴 기능")
 @RestController
 @RequestMapping("/api/v1/members")
 @RequiredArgsConstructor

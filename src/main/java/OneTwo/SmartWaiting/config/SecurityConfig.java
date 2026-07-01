@@ -50,6 +50,8 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/waitings/*/status").hasRole("OWNER")
 
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+
                         .anyRequest().authenticated() // 나머지는 다 로그인(JWT) 필요
                 )
                 .oauth2Login(oauth2 -> oauth2

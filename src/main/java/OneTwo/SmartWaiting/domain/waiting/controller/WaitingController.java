@@ -18,7 +18,7 @@ import java.net.URI;
 import java.security.Principal;
 import java.util.List;
 
-@Tag(name = "4. 웨이팅(Waiting) API", description = "웨이팅 등록, 취소, 조회 및 상태 변경 기능")
+@Tag(name = "04. 웨이팅(Waiting) API", description = "웨이팅 등록, 취소, 조회 및 상태 변경 기능")
 @RestController
 @RequestMapping("/api/v1/waitings")
 @RequiredArgsConstructor
