@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.security.Principal;
 
-@Tag(name = "5. 리뷰(Review) API", description = "식당 리뷰 작성, 조회, 삭제 기능")
+@Tag(name = "05. 리뷰(Review) API", description = "식당 리뷰 작성, 조회, 삭제 기능")
 @RestController
 @RequestMapping("/api/v1/reviews")
 @RequiredArgsConstructor

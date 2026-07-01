@@ -2,6 +2,7 @@ package OneTwo.SmartWaiting.domain.notification.controller;
 
 import OneTwo.SmartWaiting.domain.notification.service.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+@Tag(name = "07. 알림(Notification) API", description = "SSE 기반 실시간 알림 구독 기능")
 @RestController
 @RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor

@@ -13,7 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-@Tag(name = "8. 업로드(Upload) API", description = "이미지 업로드 기능")
+@Tag(name = "08. 업로드(Upload) API", description = "이미지 업로드 기능")
 @RestController
 @RequestMapping("/api/v1/uploads")
 @RequiredArgsConstructor

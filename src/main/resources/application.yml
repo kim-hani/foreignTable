@@ -108,3 +108,6 @@ cloud:
 
 springdoc:
   override-with-generic-response: false
+  swagger-ui:
+    tags-sorter: alpha        # 태그를 이름(번호) 오름차순 정렬 — @Tag 번호는 01~10 zero-padding 필요
+    operations-sorter: method # 각 태그 내 오퍼레이션을 HTTP 메서드 순으로 정렬

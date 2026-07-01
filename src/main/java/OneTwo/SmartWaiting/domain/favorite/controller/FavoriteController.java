@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 
-@Tag(name = "6. 즐겨찾기(Favorite) API", description = "식당 찜하기, 찜 해제 및 목록 조회 기능")
+@Tag(name = "06. 즐겨찾기(Favorite) API", description = "식당 찜하기, 찜 해제 및 목록 조회 기능")
 @RestController
 @RequestMapping("/api/v1/favorites")
 @RequiredArgsConstructor

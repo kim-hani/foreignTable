@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.util.List;
 
-@Tag(name = "고객지원 매뉴얼(Support Manual) API", description = "운영자(ADMIN)가 AI 챗봇의 지식 출처가 되는 고객지원 매뉴얼을 관리합니다.")
+@Tag(name = "10. 고객지원 매뉴얼(Support Manual) API", description = "운영자(ADMIN)가 AI 챗봇의 지식 출처가 되는 고객지원 매뉴얼을 관리합니다.")
 @RestController
 @RequestMapping("/api/v1/admin/support-manuals")
 @RequiredArgsConstructor

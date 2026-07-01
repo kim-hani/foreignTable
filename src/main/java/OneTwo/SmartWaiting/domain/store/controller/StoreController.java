@@ -21,7 +21,7 @@ import java.net.URI;
 import java.security.Principal;
 import java.util.List;
 
-@Tag(name = "가게(Store) API", description = "식당 등록, 조회, 수정, 삭제 기능")
+@Tag(name = "03. 가게(Store) API", description = "식당 등록, 조회, 수정, 삭제 기능")
 @RestController
 @RequestMapping("/api/v1/stores")
 @RequiredArgsConstructor
