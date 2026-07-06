@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   db:
-    image: postgis/postgis:15-3.3-alpine
+    # PostGIS + pgvector 공존 커스텀 이미지 (docker/postgres/Dockerfile)
+    build:
+      context: ./docker/postgres
     container_name: smart-waiting-db
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -12,6 +14,8 @@ services:
       - "5432:5432"
     volumes:
       - ./postgres_data:/var/lib/postgresql/data
+      # 최초 기동 시 확장(postgis/vector 등) 자동 활성화
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 30s

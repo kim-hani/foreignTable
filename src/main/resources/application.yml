@@ -81,6 +81,16 @@ spring:
         chat:
           options:
             model: gemini-2.5-flash
+        embedding:                          # RAG: 텍스트→벡터 변환기
+          text:
+            model: text-embedding-004       # 768차원 (pgvector 인덱스 2000차원 한계 이내)
+            task-type: RETRIEVAL_DOCUMENT   # 검색용 문서 임베딩 최적화
+    vectorstore:
+      pgvector:
+        initialize-schema: true             # 기동 시 vector_store 테이블/인덱스 자동 생성
+        index-type: HNSW                    # 근사 최근접 이웃 인덱스 (빠른 유사도 검색)
+        distance-type: COSINE_DISTANCE      # 코사인 거리로 의미 유사도 측정
+        dimensions: 768                     # ⚠️ 임베딩 모델 차원과 반드시 일치
 
 logging:
   level:

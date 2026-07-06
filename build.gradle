@@ -45,7 +45,10 @@ dependencies {
 
     // spring AI
 	implementation platform("org.springframework.ai:spring-ai-bom:2.0.0-M4")
-	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
+	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'          // Chat (Gemini)
+	// RAG(#42): 임베딩 모델(텍스트→벡터) + pgvector 벡터 저장소
+	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
+	implementation 'org.springframework.ai:spring-ai-starter-vector-store-pgvector'
 
 	// FCM (Firebase Cloud Messaging)
 	implementation 'com.google.firebase:firebase-admin:9.2.0'
