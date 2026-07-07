@@ -58,6 +58,8 @@ public enum ErrorCode {
 
     // ===== 고객지원 (Support) =====
     SUPPORT_MANUAL_NOT_FOUND(HttpStatus.NOT_FOUND, "CS001", "고객지원 매뉴얼을 찾을 수 없습니다."),
+    SUPPORT_VECTOR_INDEX_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "CS002", "고객지원 매뉴얼 색인 처리에 실패했습니다."),
+    SUPPORT_EMBEDDING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "CS003", "질문 임베딩 처리에 실패했습니다."),
 
     // ===== 기타 (Other) =====
     BLACKLISTED_MEMBER(HttpStatus.FORBIDDEN, "O001", "블랙리스트에 등록된 회원입니다. 이용이 제한됩니다.");
