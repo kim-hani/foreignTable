@@ -8,23 +8,23 @@ import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import java.util.Map;
 
 /**
- * SupportManual(원본 매뉴얼) ↔ VectorStore의 Document(임베딩 단위) 사이의 변환 규칙.
+ * SupportManual(원본)을 VectorStore가 쓰는 Document로 바꿔주는 변환기.
  *
- * <p>RAG의 "인덱싱" 단계에서 무엇을 벡터로 만들지가 검색 품질을 좌우한다.
- * 질문/답변/키워드를 한 문서로 합쳐 임베딩해 검색 재현율을 높인다.
- * metadata의 manualId/category는 삭제·카테고리 필터의 키로 쓰인다.
+ * RAG에서는 뭘 벡터로 만드느냐가 검색 품질을 좌우한다.
+ * 그래서 질문/답변/키워드를 한 덩어리로 합쳐서 임베딩한다. 이래야 검색이 좀 더 잘 걸린다.
+ * metadata에 넣는 manualId/category는 나중에 벡터를 지우거나 카테고리로 거를 때 키로 쓴다.
  */
 public final class SupportManualDocumentMapper {
 
-    /** 원본 매뉴얼 식별자 (수정/삭제 시 해당 벡터를 찾는 키). */
+    /** 원본 매뉴얼 id. 수정/삭제할 때 이 값으로 벡터를 찾는다. */
     public static final String META_MANUAL_ID = "manualId";
-    /** 카테고리 (검색 시 필터링 키). */
+    /** 카테고리. 검색할 때 필터 키로 쓴다. */
     public static final String META_CATEGORY = "category";
 
     private SupportManualDocumentMapper() {
     }
 
-    /** 매뉴얼 1건을 임베딩 대상 Document로 변환한다. */
+    /** 매뉴얼 1건을 임베딩할 Document로 바꾼다. */
     public static Document toDocument(SupportManual manual) {
         String content = String.format(
                 "[%s] Q: %s%nA: %s%nkeywords: %s",
@@ -43,7 +43,7 @@ public final class SupportManualDocumentMapper {
                 .build();
     }
 
-    /** 특정 매뉴얼의 벡터를 지우기 위한 metadata 필터(manualId == id). */
+    /** 특정 매뉴얼 벡터를 지울 때 쓰는 metadata 필터(manualId == id). */
     public static Filter.Expression manualIdFilter(Long manualId) {
         return new FilterExpressionBuilder().eq(META_MANUAL_ID, manualId).build();
     }
