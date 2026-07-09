@@ -43,6 +43,9 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 	implementation 'org.redisson:redisson:3.27.0'
 
+	// 실시간 상담 채팅(#43): WebSocket(STOMP) 메시징
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
     // spring AI
 	implementation platform("org.springframework.ai:spring-ai-bom:2.0.0-M4")
 	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'          // Chat (Gemini)

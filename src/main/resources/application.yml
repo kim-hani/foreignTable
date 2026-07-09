@@ -82,6 +82,7 @@ spring:
           options:
             model: gemini-2.5-flash
         embedding:                          # RAG: 텍스트→벡터 변환기
+          api-key: ${GEMINI_API_KEY}        # 임베딩 연결은 embedding 하위 api-key를 별도로 읽음(최상위 api-key 미상속) — 없으면 Vertex AI 모드로 간주해 project-id를 요구함
           text:
             model: text-embedding-004       # 768차원 (pgvector 인덱스 2000차원 한계 이내)
             task-type: RETRIEVAL_DOCUMENT   # 검색용 문서 임베딩 최적화

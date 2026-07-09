@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8"/>
+    <title>SmartWaiting 상담 채팅 테스트</title>
+    <!-- STOMP over raw WebSocket 클라이언트 (SockJS 미사용 서버 설정에 맞춤) -->
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: -apple-system, "Segoe UI", sans-serif; }
+        body { margin: 0; padding: 16px; background: #f2f3f5; }
+        h1 { font-size: 18px; margin: 0 0 12px; }
+        .config { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; }
+        .config input { width: 260px; }
+        .panels { display: flex; gap: 14px; align-items: flex-start; }
+        .panel { flex: 1; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 14px; }
+        .panel.user { border-top: 4px solid #2d7ff9; }
+        .panel.admin { border-top: 4px solid #e0533d; }
+        .panel h2 { font-size: 15px; margin: 0 0 10px; }
+        fieldset { border: 1px solid #e3e3e3; border-radius: 6px; margin: 0 0 10px; padding: 8px 10px; }
+        legend { font-size: 12px; color: #666; padding: 0 4px; }
+        label { font-size: 12px; color: #444; display: inline-block; width: 64px; }
+        input, button, select { padding: 5px 7px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; }
+        input { width: 150px; }
+        button { background: #2d7ff9; color: #fff; border: none; cursor: pointer; margin: 2px 0; }
+        button.admin-btn { background: #e0533d; }
+        button.gray { background: #777; }
+        button:disabled { background: #bbb; cursor: not-allowed; }
+        .row { margin: 4px 0; }
+        .status { font-size: 12px; font-weight: 600; }
+        .status.on { color: #1a9e4b; }
+        .status.off { color: #999; }
+        .log { background: #1e1e1e; color: #d4d4d4; font-family: Consolas, monospace; font-size: 12px;
+               height: 300px; overflow-y: auto; border-radius: 6px; padding: 8px; white-space: pre-wrap; margin-top: 8px; }
+        .log .talk { color: #9cdcfe; }
+        .log .system { color: #dcdcaa; }
+        .log .read { color: #808080; }
+        .log .err { color: #f48771; }
+        .log .rest { color: #b5cea8; }
+        .roomId { font-weight: 700; color: #e0533d; }
+    </style>
+</head>
+<body>
+<h1>SmartWaiting 상담 채팅 테스트 (#43)</h1>
+<div class="config">
+    <label style="width:auto">REST</label>
+    <input id="restBase" value="http://localhost:8080"/>
+    &nbsp;&nbsp;
+    <label style="width:auto">WS</label>
+    <input id="wsUrl" value="ws://localhost:8080/ws"/>
+    <span style="color:#888"> — 이 페이지는 반드시 http://localhost:3000 에서 열어야 합니다(CORS).</span>
+</div>
+
+<div class="panels">
+    <!-- ===================== USER 패널 ===================== -->
+    <div class="panel user" id="panel-user">
+        <h2>👤 USER (고객)</h2>
+        <fieldset>
+            <legend>1. 로그인</legend>
+            <div class="row"><label>loginId</label><input class="loginId" value="user01"/></div>
+            <div class="row"><label>password</label><input class="password" type="password" value="Test1234!"/></div>
+            <div class="row"><button onclick="login('user', false)">일반 로그인</button>
+                <span class="status off tokenStatus">토큰 없음</span></div>
+        </fieldset>
+        <fieldset>
+            <legend>2. 상담방</legend>
+            <div class="row">
+                <button onclick="createRoom('user')">방 생성/상담원 연결</button>
+                <button class="gray" onclick="getMyRoom('user')">내 방 조회</button>
+            </div>
+            <div class="row">roomId: <span class="roomId roomIdView">-</span></div>
+        </fieldset>
+        <fieldset>
+            <legend>3. WebSocket</legend>
+            <div class="row">
+                <button onclick="wsConnect('user')">연결 & 구독</button>
+                <button class="gray" onclick="wsDisconnect('user')">해제</button>
+                <span class="status off wsStatus">미연결</span>
+            </div>
+        </fieldset>
+        <fieldset>
+            <legend>4. 메시지</legend>
+            <div class="row"><input class="msgInput" placeholder="메시지 입력" style="width:180px"/>
+                <button onclick="sendMsg('user')">전송</button></div>
+            <div class="row">
+                <button class="gray" onclick="markRead('user')">읽음 처리</button>
+                <button class="gray" onclick="loadHistory('user')">이력 조회</button>
+                <button class="gray" onclick="closeRoom('user')">상담 종료</button>
+            </div>
+        </fieldset>
+        <div class="log logBox"></div>
+    </div>
+
+    <!-- ===================== ADMIN 패널 ===================== -->
+    <div class="panel admin" id="panel-admin">
+        <h2>🎧 ADMIN (상담원)</h2>
+        <fieldset>
+            <legend>1. 로그인</legend>
+            <div class="row"><label>loginId</label><input class="loginId" value="admin01"/></div>
+            <div class="row"><label>password</label><input class="password" type="password" value="Test1234!"/></div>
+            <div class="row"><button class="admin-btn" onclick="login('admin', true)">관리자 로그인</button>
+                <span class="status off tokenStatus">토큰 없음</span></div>
+        </fieldset>
+        <fieldset>
+            <legend>2. 대기열</legend>
+            <div class="row">
+                <select class="statusSel">
+                    <option value="WAITING">WAITING</option>
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="CLOSED">CLOSED</option>
+                </select>
+                <button class="admin-btn" onclick="listRooms('admin')">목록 조회</button>
+            </div>
+            <div class="row"><label style="width:auto">roomId</label>
+                <input class="roomIdInput" placeholder="목록에서 확인" style="width:80px"/>
+                <button class="admin-btn" onclick="claimRoom('admin')">수락(claim)</button>
+            </div>
+            <div class="row">roomId: <span class="roomId roomIdView">-</span></div>
+        </fieldset>
+        <fieldset>
+            <legend>3. WebSocket</legend>
+            <div class="row">
+                <button class="admin-btn" onclick="wsConnect('admin')">연결 & 구독</button>
+                <button class="gray" onclick="wsDisconnect('admin')">해제</button>
+                <span class="status off wsStatus">미연결</span>
+            </div>
+        </fieldset>
+        <fieldset>
+            <legend>4. 메시지</legend>
+            <div class="row"><input class="msgInput" placeholder="메시지 입력" style="width:180px"/>
+                <button class="admin-btn" onclick="sendMsg('admin')">전송</button></div>
+            <div class="row">
+                <button class="gray" onclick="markRead('admin')">읽음 처리</button>
+                <button class="gray" onclick="loadHistory('admin')">이력 조회</button>
+                <button class="gray" onclick="closeRoom('admin')">상담 종료</button>
+            </div>
+        </fieldset>
+        <div class="log logBox"></div>
+    </div>
+</div>
+
+<script>
+    // 패널별 상태 (토큰, roomId, STOMP 클라이언트/구독)
+    const state = {
+        user:  { token: null, roomId: null, client: null, sub: null },
+        admin: { token: null, roomId: null, client: null, sub: null },
+    };
+
+    const restBase = () => document.getElementById('restBase').value.replace(/\/$/, '');
+    const wsUrl = () => document.getElementById('wsUrl').value;
+    const panel = (who) => document.getElementById('panel-' + who);
+    const $ = (who, sel) => panel(who).querySelector(sel);
+
+    function log(who, msg, cls = '') {
+        const box = $(who, '.logBox');
+        const time = new Date().toLocaleTimeString();
+        const line = document.createElement('div');
+        if (cls) line.className = cls;
+        line.textContent = `[${time}] ${msg}`;
+        box.appendChild(line);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function setRoom(who, roomId) {
+        state[who].roomId = roomId;
+        $(who, '.roomIdView').textContent = roomId ?? '-';
+    }
+
+    async function api(who, method, path, body) {
+        const headers = { 'Content-Type': 'application/json' };
+        if (state[who].token) headers['Authorization'] = 'Bearer ' + state[who].token;
+        const res = await fetch(restBase() + path, {
+            method, headers, body: body ? JSON.stringify(body) : undefined,
+        });
+        const text = await res.text();
+        let data = null;
+        try { data = text ? JSON.parse(text) : null; } catch (e) { data = text; }
+        if (!res.ok) {
+            const code = data && data.code ? `${data.code} ${data.message}` : `HTTP ${res.status}`;
+            log(who, `✗ ${method} ${path} → ${code}`, 'err');
+            throw new Error(code);
+        }
+        log(who, `✓ ${method} ${path} → ${res.status}`, 'rest');
+        return data;
+    }
+
+    // ---------- 1. 로그인 ----------
+    async function login(who, isAdmin) {
+        const loginId = $(who, '.loginId').value.trim();
+        const password = $(who, '.password').value;
+        const path = isAdmin ? '/api/v1/auth/admin/signin' : '/api/v1/auth/signin';
+        try {
+            const data = await api(who, 'POST', path, { loginId, password });
+            state[who].token = data.accessToken;
+            const st = $(who, '.tokenStatus');
+            st.textContent = '토큰 발급됨';
+            st.className = 'status on tokenStatus';
+            log(who, `로그인 성공 (토큰 앞 20자: ${data.accessToken.slice(0, 20)}...)`);
+        } catch (e) { /* 로그는 api()에서 남김 */ }
+    }
+
+    // ---------- 2. 상담방 ----------
+    async function createRoom(who) {
+        try {
+            const data = await api(who, 'POST', '/api/v1/support/chat-rooms');
+            setRoom(who, data.roomId);
+            log(who, `방 생성/재사용 완료 — roomId=${data.roomId}, status=${data.status}, 미읽음=${data.unreadCount}`);
+        } catch (e) {}
+    }
+
+    async function getMyRoom(who) {
+        try {
+            const data = await api(who, 'GET', '/api/v1/support/chat-rooms/me');
+            setRoom(who, data.roomId);
+            log(who, `내 방 — roomId=${data.roomId}, status=${data.status}, 미읽음=${data.unreadCount}`);
+        } catch (e) {}
+    }
+
+    async function listRooms(who) {
+        const status = $(who, '.statusSel').value;
+        try {
+            const data = await api(who, 'GET', `/api/v1/admin/chat-rooms?status=${status}&size=20`);
+            const rooms = data.content || [];
+            log(who, `[${status}] 방 ${rooms.length}건`);
+            rooms.forEach(r => log(who,
+                `  · roomId=${r.roomId} 고객=${r.memberName} 담당=${r.adminName ?? '미배정'} 미읽음=${r.unreadCount}`));
+        } catch (e) {}
+    }
+
+    async function claimRoom(who) {
+        const roomId = $(who, '.roomIdInput').value.trim();
+        if (!roomId) { log(who, 'roomId를 입력하세요.', 'err'); return; }
+        try {
+            const data = await api(who, 'PATCH', `/api/v1/admin/chat-rooms/${roomId}/claim`);
+            setRoom(who, data.roomId);
+            log(who, `상담 수락 완료 — roomId=${data.roomId}, status=${data.status}`);
+        } catch (e) {}
+    }
+
+    async function closeRoom(who) {
+        const roomId = state[who].roomId;
+        if (!roomId) { log(who, '먼저 roomId를 설정하세요.', 'err'); return; }
+        const path = who === 'admin'
+            ? `/api/v1/admin/chat-rooms/${roomId}/close`
+            : `/api/v1/support/chat-rooms/${roomId}/close`;
+        try { await api(who, 'PATCH', path); log(who, '상담 종료 요청 완료'); } catch (e) {}
+    }
+
+    async function markRead(who) {
+        const roomId = state[who].roomId;
+        if (!roomId) { log(who, '먼저 roomId를 설정하세요.', 'err'); return; }
+        try { await api(who, 'PATCH', `/api/v1/support/chat-rooms/${roomId}/read`); log(who, '읽음 처리 요청 완료'); } catch (e) {}
+    }
+
+    async function loadHistory(who) {
+        const roomId = state[who].roomId;
+        if (!roomId) { log(who, '먼저 roomId를 설정하세요.', 'err'); return; }
+        try {
+            const data = await api(who, 'GET', `/api/v1/support/chat-rooms/${roomId}/messages?size=50`);
+            const msgs = (data.content || []).slice().reverse();
+            log(who, `이력 ${msgs.length}건`);
+            msgs.forEach(m => log(who, `  ${m.senderName}: ${m.content} ${m.isRead ? '(읽음)' : ''}`));
+        } catch (e) {}
+    }
+
+    // ---------- 3. WebSocket ----------
+    function wsConnect(who) {
+        const s = state[who];
+        if (!s.token) { log(who, '먼저 로그인하세요.', 'err'); return; }
+        if (!s.roomId) { log(who, '먼저 roomId를 설정하세요.', 'err'); return; }
+        if (s.client && s.client.active) { log(who, '이미 연결됨', 'err'); return; }
+
+        const client = new StompJs.Client({
+            brokerURL: wsUrl(),
+            connectHeaders: { Authorization: 'Bearer ' + s.token },
+            reconnectDelay: 0, // 테스트 편의상 자동 재연결 끔
+            onConnect: () => {
+                $(who, '.wsStatus').textContent = '연결됨';
+                $(who, '.wsStatus').className = 'status on wsStatus';
+                log(who, 'STOMP CONNECT 성공');
+                s.sub = client.subscribe('/sub/chat/room/' + s.roomId, (frame) => {
+                    const m = JSON.parse(frame.body);
+                    renderIncoming(who, m);
+                });
+                log(who, `구독 시작 → /sub/chat/room/${s.roomId}`);
+            },
+            onStompError: (frame) => log(who, 'STOMP ERROR: ' + frame.headers['message'], 'err'),
+            onWebSocketError: () => log(who, 'WebSocket 오류 (핸드셰이크 거부? CORS/포트 확인)', 'err'),
+            onWebSocketClose: () => {
+                $(who, '.wsStatus').textContent = '미연결';
+                $(who, '.wsStatus').className = 'status off wsStatus';
+            },
+        });
+        s.client = client;
+        client.activate();
+    }
+
+    function wsDisconnect(who) {
+        const s = state[who];
+        if (s.sub) { s.sub.unsubscribe(); s.sub = null; }
+        if (s.client) { s.client.deactivate(); log(who, 'STOMP 연결 해제'); }
+    }
+
+    function renderIncoming(who, m) {
+        if (m.type === 'SYSTEM') {
+            log(who, `🔔 [시스템] ${m.content}`, 'system');
+        } else if (m.type === 'READ') {
+            log(who, `👁 상대방이 읽었습니다 (readerId=${m.senderId})`, 'read');
+        } else {
+            log(who, `💬 ${m.senderName}: ${m.content}`, 'talk');
+        }
+    }
+
+    function sendMsg(who) {
+        const s = state[who];
+        if (!s.client || !s.client.active) { log(who, '먼저 WebSocket 연결하세요.', 'err'); return; }
+        const input = $(who, '.msgInput');
+        const content = input.value.trim();
+        if (!content) return;
+        s.client.publish({
+            destination: '/pub/chat/room/' + s.roomId,
+            body: JSON.stringify({ content }),
+        });
+        input.value = '';
+    }
+
+    // Enter 키로 전송
+    ['user', 'admin'].forEach(who => {
+        panel(who).querySelector('.msgInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendMsg(who);
+        });
+    });
+</script>
+</body>
+</html>
