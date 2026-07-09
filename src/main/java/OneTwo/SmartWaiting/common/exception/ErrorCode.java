@@ -61,6 +61,13 @@ public enum ErrorCode {
     SUPPORT_VECTOR_INDEX_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "CS002", "고객지원 매뉴얼 색인 처리에 실패했습니다."),
     SUPPORT_EMBEDDING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "CS003", "질문 임베딩 처리에 실패했습니다."),
 
+    // ===== 상담 채팅 (Chat) =====
+    CHATROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CH001", "상담 채팅방을 찾을 수 없습니다."),
+    NOT_CHATROOM_PARTICIPANT(HttpStatus.FORBIDDEN, "CH002", "해당 상담 채팅방의 참여자가 아닙니다."),
+    CHATROOM_ALREADY_CLAIMED(HttpStatus.CONFLICT, "CH003", "이미 다른 상담원이 배정된 채팅방입니다."),
+    CHATROOM_ALREADY_CLOSED(HttpStatus.BAD_REQUEST, "CH004", "이미 종료된 상담 채팅방입니다."),
+    CHAT_MESSAGE_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "CH005", "채팅 메시지 전송에 실패했습니다."),
+
     // ===== 기타 (Other) =====
     BLACKLISTED_MEMBER(HttpStatus.FORBIDDEN, "O001", "블랙리스트에 등록된 회원입니다. 이용이 제한됩니다.");
 
