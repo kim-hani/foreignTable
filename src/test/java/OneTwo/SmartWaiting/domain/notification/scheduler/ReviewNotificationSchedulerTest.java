@@ -1,5 +1,6 @@
 package OneTwo.SmartWaiting.domain.notification.scheduler;
 
+import OneTwo.SmartWaiting.common.scheduler.SchedulerLock;
 import OneTwo.SmartWaiting.domain.member.entity.Member;
 import OneTwo.SmartWaiting.domain.notification.service.FcmService;
 import OneTwo.SmartWaiting.domain.store.entity.Store;
@@ -41,10 +42,18 @@ class ReviewNotificationSchedulerTest {
     @Mock
     private FcmService fcmService;
 
+    @Mock
+    private SchedulerLock schedulerLock;
+
+    private void givenLockAcquired(boolean acquired) {
+        when(schedulerLock.tryAcquire(eq("sendReviewRequestNotifications"), any(Duration.class))).thenReturn(acquired);
+    }
+
     @Test
     @DisplayName("조회 구간 - 분 단위로 정렬된 1분짜리 [start, end) 구간으로 SEATED 웨이팅을 조회한다.")
     void sendReviewRequestNotifications_QueriesMinuteAlignedOneMinuteWindow() {
         // given
+        givenLockAcquired(true);
         ArgumentCaptor<LocalDateTime> startCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
         ArgumentCaptor<LocalDateTime> endCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
         LocalDateTime before = LocalDateTime.now();
@@ -86,6 +95,7 @@ class ReviewNotificationSchedulerTest {
     @DisplayName("푸시 발송 - 조회된 대상마다 회원 토큰과 가게 정보로 리뷰 요청 푸시를 보낸다.")
     void sendReviewRequestNotifications_SendsPushPerTarget() {
         // given
+        givenLockAcquired(true);
         Member member = mock(Member.class);
         when(member.getFcmToken()).thenReturn("token-1");
         Store store = mock(Store.class);
@@ -107,10 +117,27 @@ class ReviewNotificationSchedulerTest {
     @Test
     @DisplayName("대상 없음 - 조회 결과가 없으면 푸시를 보내지 않는다.")
     void sendReviewRequestNotifications_NoTargets_SendsNothing() {
+        // given
+        givenLockAcquired(true);
+
         // when
         reviewNotificationScheduler.sendReviewRequestNotifications();
 
         // then
+        verify(fcmService, never()).sendReviewRequestPush(any(), anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("락 획득 실패 - 다른 인스턴스가 이번 분을 처리 중이면 조회·발송을 건너뛴다.")
+    void sendReviewRequestNotifications_LockHeldByOtherInstance_Skips() {
+        // given
+        givenLockAcquired(false);
+
+        // when
+        reviewNotificationScheduler.sendReviewRequestNotifications();
+
+        // then
+        verify(waitingRepository, never()).findAllWithMemberAndStoreByStatusAndUpdatedAtRange(any(), any(), any());
         verify(fcmService, never()).sendReviewRequestPush(any(), anyString(), anyString(), anyLong());
     }
 }
