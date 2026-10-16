@@ -38,13 +38,19 @@ public class CleanupScheduler {
 
         for(Waiting waiting : ghostWaitings){
             waiting.changeStatus(WaitingStatus.CANCEL);
-
-            notificationService.closeConnection(waiting.getMember().getId());
-
-            String message = "영업 시간이 종료되어 대기가 자동 취소되었습니다. 이용에 불편을 드려 정말 죄송합니다.";
-            notificationService.sendToClient(waiting.getMember().getId(), message);
-
             cleanupCount++;
+        }
+
+        // SSE 알림 전 상태 변경을 DB에 반영
+        waitingRepository.flush();
+
+        String message = "영업 시간이 종료되어 대기가 자동 취소되었습니다. 이용에 불편을 드려 정말 죄송합니다.";
+        for(Waiting waiting : ghostWaitings){
+            Long memberId = waiting.getMember().getId();
+
+            // 연결을 끊기 전에 안내 메시지를 먼저 보내야 전달됨
+            notificationService.sendToClient(memberId, message);
+            notificationService.closeConnection(memberId);
         }
 
         log.info("유령 웨이팅 정리 작업 완료. 총 {}건 정리됨", cleanupCount);
