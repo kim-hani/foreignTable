@@ -34,7 +34,12 @@ public interface WaitingRepository extends JpaRepository<Waiting, Long> {
 
     Page<Waiting> findByStoreIdAndStatusInOrderByTicketTimeAsc(Long storeId, List<WaitingStatus> statuses, Pageable pageable);
 
-    List<Waiting> findAllByStatusAndUpdatedAtBetween(WaitingStatus status, LocalDateTime start, LocalDateTime end);
+    // 리뷰 요청 스케줄러용: [start, end) 반개구간으로 매분 구간이 겹치지 않게 조회, 회원·가게 fetch join으로 N+1 방지
+    @Query("SELECT w FROM Waiting w JOIN FETCH w.member JOIN FETCH w.store " +
+            "WHERE w.status = :status AND w.updatedAt >= :start AND w.updatedAt < :end")
+    List<Waiting> findAllWithMemberAndStoreByStatusAndUpdatedAtRange(@Param("status") WaitingStatus status,
+                                                                    @Param("start") LocalDateTime start,
+                                                                    @Param("end") LocalDateTime end);
 
     List<Waiting> findAllByStatusIn(List<WaitingStatus> list);
 
