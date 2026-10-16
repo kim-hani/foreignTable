@@ -86,10 +86,34 @@ NotificationService.subscribe(email)
 이후 서버 이벤트 발생 시 emitter.send()로 실시간 push
 ```
 
-### 2.3 알림 발송 & 연결 종료
+### 2.3 알림 발송 & 연결 종료 (Redis Pub/Sub로 인스턴스 간 전달)
+
+`SseEmitter`는 연결을 받은 인스턴스의 메모리에만 있다. 서버가 여러 대면 알림을 만든 인스턴스와 손님이 연결된 인스턴스가 다를 수 있으므로, 발송·종료 요청은 Redis 채널 `sse:notification`으로 발행하고 **모든 인스턴스가 구독**해 해당 회원의 연결을 가진 인스턴스만 실제로 처리한다.
+
+```
+WaitingNotificationListener (커밋 후)
+  │ notificationService.sendToClient(memberId, msg) / closeConnection(memberId)
+  ▼
+SseRedisPublisher ── PUBLISH sse:notification {type: SEND|CLOSE, memberId, data}
+  │
+  ▼ (모든 인스턴스)
+SseRedisSubscriber ── 단일 스레드 컨테이너(sse-redis-*)라 발행 순서 유지 (메시지 → 종료)
+  │
+  ▼
+notificationService.deliverLocal(memberId, msg) / closeLocal(memberId)
+  └─ 이 인스턴스에 연결이 있을 때만 emitter.send / emitter.complete
+```
 
 ```java
-public void sendToClient(Long memberId, Object data) {
+public void sendToClient(Long memberId, String data) {
+    try {
+        sseRedisPublisher.publish(SseRedisMessage.send(memberId, data));
+    } catch (Exception e) {
+        deliverLocal(memberId, data);   // Redis 장애 시 이 인스턴스 연결로라도 전달
+    }
+}
+
+public void deliverLocal(Long memberId, String data) {   // SseRedisSubscriber가 호출
     SseEmitter emitter = emitters.get(memberId);
     if (emitter != null) {
         try {
@@ -98,26 +122,20 @@ public void sendToClient(Long memberId, Object data) {
                 .name("waiting-alert")   // 모든 알림 이벤트명 통일
                 .data(data));
         } catch (IOException e) {
-            emitters.remove(memberId);   // 전송 실패 = 죽은 연결로 간주, 제거
+            emitters.remove(memberId, emitter);   // 전송 실패 = 죽은 연결로 간주, 제거
         }
-    }
-}
-
-public void closeConnection(Long memberId) {  // 종료 상태(착석/취소/노쇼) 시
-    SseEmitter emitter = emitters.get(memberId);
-    if (emitter != null) {
-        emitter.complete();      // 연결 정상 종료
-        emitters.remove(memberId);
     }
 }
 ```
 
 **메모리 누수 방지 설계**:
 - 전송 실패(`IOException`) → 즉시 맵에서 제거
-- 종료 상태 도달 → `closeConnection()`으로 명시적 정리
-- 타임아웃/완료 콜백 → 자동 제거
+- 종료 상태 도달 → `closeConnection()` → 연결을 가진 인스턴스의 `closeLocal()`로 명시적 정리
+- 타임아웃/완료/에러 콜백 → 자동 제거 (재연결로 교체된 새 연결은 지우지 않도록 `(memberId, emitter)` 일치 시에만)
 
-> ⚠️ **현재 한계 1 (스케일 아웃)**: `ConcurrentHashMap`은 **단일 인스턴스 메모리**에만 존재. 서버를 여러 대로 확장하면 다른 인스턴스에 연결된 사용자에게 알림이 안 감. → Redis Pub/Sub 기반 확장이 향후 과제.
+> 구독 직후의 연결 확립 이벤트와 Heartbeat는 자기 인스턴스의 연결에만 보내므로 Redis를 거치지 않는다.
+>
+> 채팅(`chat:room:*`)과 리스너 컨테이너를 분리했다. 기본 컨테이너는 메시지마다 다른 스레드에서 처리할 수 있어 "안내 메시지 → 연결 종료" 순서가 뒤바뀌면 메시지가 유실되기 때문이다.
 
 > ⚠️ **현재 한계 2 (연결 유지)**: `SseEmitter` 타임아웃은 60분이지만 **Heartbeat(주기적 핑)가 없음**. nginx·ALB·모바일 네트워크의 idle timeout(통상 60초)이 먼저 연결을 끊을 수 있고, 재연결·유실 복구 메커니즘도 없음. → **§8 개선 로드맵** 참조.
 

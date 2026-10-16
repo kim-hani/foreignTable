@@ -3,6 +3,8 @@ package OneTwo.SmartWaiting.domain.notification.service;
 import OneTwo.SmartWaiting.common.exception.BusinessException;
 import OneTwo.SmartWaiting.common.exception.ErrorCode;
 import OneTwo.SmartWaiting.domain.member.repository.MemberRepository;
+import OneTwo.SmartWaiting.domain.notification.redis.SseRedisMessage;
+import OneTwo.SmartWaiting.domain.notification.redis.SseRedisPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -25,6 +27,7 @@ public class NotificationService {
     private final Map<Long, SseEmitter> emitters = new ConcurrentHashMap<>();
 
     private final MemberRepository memberRepository;
+    private final SseRedisPublisher sseRedisPublisher;
 
     // 1. 클라이언트가 구독을 요청할 때 실행되는 메서드 (email = JWT 인증 사용자)
     public SseEmitter subscribe(String email) {
@@ -47,14 +50,26 @@ public class NotificationService {
         emitter.onTimeout(() -> emitters.remove(memberId, emitter));
         emitter.onError(e -> emitters.remove(memberId, emitter));
 
-        // 503 에러 방지를 위한 더미(Dummy) 이벤트 최초 발송
-        sendToClient(memberId, "EventStream Created. [userId=" + memberId + "]");
+        // 503 에러 방지를 위한 더미(Dummy) 이벤트 최초 발송 — 방금 이 인스턴스에 연결됐으므로 직접 전달
+        deliverLocal(memberId, "EventStream Created. [userId=" + memberId + "]");
 
         return emitter;
     }
 
     // 2. 특정 사용자에게 알림 데이터를 쏘는 메서드
-    public void sendToClient(Long memberId, Object data) {
+    // 손님의 연결이 어느 인스턴스에 있는지 모르므로 Redis로 발행 → 연결을 가진 인스턴스가 deliverLocal로 전달
+    public void sendToClient(Long memberId, String data) {
+        try {
+            sseRedisPublisher.publish(SseRedisMessage.send(memberId, data));
+        } catch (Exception e) {
+            // Redis 장애 시에도 이 인스턴스에 연결된 손님에게는 전달 (단일 인스턴스와 같은 동작 보장)
+            log.warn("SSE Redis 발행 실패로 로컬 전달로 대체: 사용자 ID = {}", memberId, e);
+            deliverLocal(memberId, data);
+        }
+    }
+
+    // 이 인스턴스에 연결된 경우에만 전달 (Redis 구독자 SseRedisSubscriber가 호출)
+    public void deliverLocal(Long memberId, String data) {
         SseEmitter emitter = emitters.get(memberId);
         if (emitter != null) {
             try {
@@ -85,11 +100,22 @@ public class NotificationService {
         });
     }
 
+    // 연결이 다른 인스턴스에 있을 수 있으므로 종료 요청도 Redis로 발행
     public void closeConnection(Long memberId){
+        try {
+            sseRedisPublisher.publish(SseRedisMessage.close(memberId));
+        } catch (Exception e) {
+            log.warn("SSE Redis 발행 실패로 로컬 종료로 대체: 사용자 ID = {}", memberId, e);
+            closeLocal(memberId);
+        }
+    }
+
+    // 이 인스턴스에 연결된 경우에만 종료 (Redis 구독자 SseRedisSubscriber가 호출)
+    public void closeLocal(Long memberId){
         SseEmitter emitter = emitters.get(memberId);
         if(emitter != null){
             emitter.complete(); // 클라이언트와의 연결 종료
-            emitters.remove(memberId); // Map에서 제거
+            emitters.remove(memberId, emitter); // Map에서 제거 (재연결로 교체된 새 연결은 유지)
             log.info("🔒 연결 종료: 사용자 ID = {}", memberId);
         }
     }

@@ -1,11 +1,15 @@
 package OneTwo.SmartWaiting.config;
 
 import OneTwo.SmartWaiting.domain.chat.redis.RedisChatSubscriber;
+import OneTwo.SmartWaiting.domain.notification.redis.SseRedisPublisher;
+import OneTwo.SmartWaiting.domain.notification.redis.SseRedisSubscriber;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
  * 실시간 상담 채팅(#43)용 Redis Pub/Sub 설정.
@@ -26,6 +30,31 @@ public class RedisConfig {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
         container.addMessageListener(redisChatSubscriber, new PatternTopic("chat:room:*"));
+        return container;
+    }
+
+    /**
+     * SSE 스케일 아웃용 Redis Pub/Sub ("sse:notification").
+     *
+     * <p>채팅과 컨테이너를 분리해 단일 스레드로 처리한다. 기본 컨테이너는 메시지마다 다른 스레드에서 처리할 수 있어
+     * "안내 메시지 → 연결 종료"처럼 순서가 중요한 요청이 뒤바뀌면 메시지가 유실된다.
+     */
+    @Bean
+    public RedisMessageListenerContainer sseRedisMessageListenerContainer(
+            RedisConnectionFactory connectionFactory,
+            SseRedisSubscriber sseRedisSubscriber
+    ) {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setThreadNamePrefix("sse-redis-");
+        executor.setDaemon(true);
+        executor.initialize();
+
+        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+        container.setConnectionFactory(connectionFactory);
+        container.setTaskExecutor(executor);
+        container.addMessageListener(sseRedisSubscriber, new ChannelTopic(SseRedisPublisher.CHANNEL));
         return container;
     }
 }
