@@ -1,0 +1,98 @@
+package OneTwo.SmartWaiting.domain.notification.scheduler;
+
+import OneTwo.SmartWaiting.domain.member.entity.Member;
+import OneTwo.SmartWaiting.domain.notification.service.FcmService;
+import OneTwo.SmartWaiting.domain.store.entity.Store;
+import OneTwo.SmartWaiting.domain.waiting.entity.Waiting;
+import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
+import OneTwo.SmartWaiting.domain.waiting.repository.WaitingRepository;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class ReviewNotificationSchedulerTest {
+
+    @InjectMocks
+    private ReviewNotificationScheduler reviewNotificationScheduler;
+
+    @Mock
+    private WaitingRepository waitingRepository;
+
+    @Mock
+    private FcmService fcmService;
+
+    @Test
+    @DisplayName("조회 구간 - 분 단위로 절삭된 1분짜리 [start, end) 구간으로 SEATED 웨이팅을 조회한다.")
+    void sendReviewRequestNotifications_QueriesMinuteAlignedOneMinuteWindow() {
+        // given
+        ArgumentCaptor<LocalDateTime> startCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> endCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        LocalDateTime before = LocalDateTime.now();
+
+        // when
+        reviewNotificationScheduler.sendReviewRequestNotifications();
+
+        // then
+        verify(waitingRepository).findAllWithMemberAndStoreByStatusAndUpdatedAtRange(
+                eq(WaitingStatus.SEATED), startCaptor.capture(), endCaptor.capture());
+        LocalDateTime start = startCaptor.getValue();
+        LocalDateTime end = endCaptor.getValue();
+
+        assertThat(Duration.between(start, end)).isEqualTo(Duration.ofMinutes(1));
+        assertThat(start.getSecond()).isZero();
+        assertThat(start.getNano()).isZero();
+        assertThat(end).isBeforeOrEqualTo(before.minusMinutes(59));
+    }
+
+    @Test
+    @DisplayName("푸시 발송 - 조회된 대상마다 회원 토큰과 가게 정보로 리뷰 요청 푸시를 보낸다.")
+    void sendReviewRequestNotifications_SendsPushPerTarget() {
+        // given
+        Member member = mock(Member.class);
+        when(member.getFcmToken()).thenReturn("token-1");
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(10L);
+        when(store.getName()).thenReturn("맛집");
+        Waiting waiting = mock(Waiting.class);
+        when(waiting.getMember()).thenReturn(member);
+        when(waiting.getStore()).thenReturn(store);
+        when(waitingRepository.findAllWithMemberAndStoreByStatusAndUpdatedAtRange(eq(WaitingStatus.SEATED), any(), any()))
+                .thenReturn(List.of(waiting));
+
+        // when
+        reviewNotificationScheduler.sendReviewRequestNotifications();
+
+        // then
+        verify(fcmService).sendReviewRequestPush(eq("token-1"), anyString(), contains("맛집"), eq(10L));
+    }
+
+    @Test
+    @DisplayName("대상 없음 - 조회 결과가 없으면 푸시를 보내지 않는다.")
+    void sendReviewRequestNotifications_NoTargets_SendsNothing() {
+        // when
+        reviewNotificationScheduler.sendReviewRequestNotifications();
+
+        // then
+        verify(fcmService, never()).sendReviewRequestPush(any(), anyString(), anyString(), anyLong());
+    }
+}

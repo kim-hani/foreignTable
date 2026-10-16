@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Slf4j
@@ -26,12 +27,13 @@ public class ReviewNotificationScheduler {
     @Scheduled(cron = "0 * * * * *")
     @Transactional(readOnly = true)
     public void sendReviewRequestNotifications() {
-        LocalDateTime now = LocalDateTime.now();
+        // 분 단위로 절삭해 실행 지연(ms)이 있어도 매분 구간이 빈틈·중복 없이 이어지도록 함
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
         LocalDateTime start = now.minusMinutes(61);
         LocalDateTime end = now.minusMinutes(60);
 
         // 실제 방문 기록이 있는 사용자들에게만 푸시 알림 전송
-        List<Waiting> targets = waitingRepository.findAllByStatusAndUpdatedAtBetween(
+        List<Waiting> targets = waitingRepository.findAllWithMemberAndStoreByStatusAndUpdatedAtRange(
                 WaitingStatus.SEATED, start, end
         );
 

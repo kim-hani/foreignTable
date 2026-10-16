@@ -10,6 +10,8 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
+// 리뷰 요청 스케줄러가 매분 (status, updatedAt) 조건으로 조회하므로 전체 테이블 스캔 방지
+@Table(indexes = @Index(name = "idx_waiting_status_updated_at", columnList = "status, updated_at"))
 @Getter
 @Builder
 @NoArgsConstructor (access = AccessLevel.PROTECTED)
