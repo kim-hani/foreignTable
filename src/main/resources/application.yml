@@ -2,6 +2,12 @@ spring:
   application:
     name: SmartWaiting
 
+  # @Scheduled 작업(SSE Heartbeat, 리뷰 요청 FCM, 새벽 배치)이 서로를 막지 않도록 기본값 1에서 확장
+  task:
+    scheduling:
+      pool:
+        size: 4
+
   data:
     redis:
       host: localhost

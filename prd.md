@@ -137,7 +137,7 @@ CALL    → NOSHOW         (호출 후 미응답)
 
 | 기능 | 엔드포인트 | 설명 |
 |---|---|---|
-| SSE 구독 | `GET /subscribe/{memberId}` | 60분 유지, `waiting-alert` 이벤트 |
+| SSE 구독 | `GET /subscribe` (JWT 인증 사용자) | 60분 유지, `waiting-alert` 이벤트, 25초 Heartbeat |
 
 **알림 트리거**
 | 이벤트 | 수신자 | 메시지 |
@@ -419,7 +419,7 @@ CALL    → NOSHOW         (호출 후 미응답)
 | 21 | Waiting | PATCH | /api/v1/waitings/{id}/status | OWNER | 상태 변경 |
 | 22 | Waiting | GET | /api/v1/waitings/my | USER | 내 웨이팅 목록 |
 | 23 | Waiting | GET | /api/v1/waitings/store/{storeId} | OWNER | 가게 대기열 조회 |
-| 24 | Notification | GET | /api/v1/notifications/subscribe/{memberId} | 인증 | SSE 실시간 구독 |
+| 24 | Notification | GET | /api/v1/notifications/subscribe | 인증 | SSE 실시간 구독 |
 | 25 | Review | POST | /api/v1/reviews | USER | 리뷰 작성 |
 | 26 | Review | GET | /api/v1/reviews/store/{storeId} | 누구나 | 가게 리뷰 목록 |
 | 27 | Review | GET | /api/v1/reviews/my | USER | 내 리뷰 목록 |
