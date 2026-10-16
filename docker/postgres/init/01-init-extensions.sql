@@ -10,3 +10,6 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- PgVectorStore가 metadata/식별자 처리에 사용
 CREATE EXTENSION IF NOT EXISTS hstore;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 식당 이름 부분 일치 검색(LIKE '%키워드%')용 trigram 인덱스
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
