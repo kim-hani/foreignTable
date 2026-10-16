@@ -11,6 +11,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -26,6 +27,41 @@ class NotificationServiceTest {
     void setUp() {
         notificationService = new NotificationService();
         emitters = (Map<Long, SseEmitter>) ReflectionTestUtils.getField(notificationService, "emitters");
+    }
+
+    @Test
+    @DisplayName("재구독 - 이전 emitter는 종료되고 Map에는 새 emitter만 남는다.")
+    void subscribe_Resubscribe_CompletesPreviousAndKeepsNew() {
+        // given
+        SseEmitter previous = mock(SseEmitter.class);
+        emitters.put(1L, previous);
+
+        // when
+        SseEmitter current = notificationService.subscribe(1L);
+
+        // then
+        verify(previous, times(1)).complete();
+        assertThat(emitters).containsEntry(1L, current);
+        assertThat(current).isNotSameAs(previous);
+    }
+
+    @Test
+    @DisplayName("알림 전송 실패 - 실패한 emitter가 이미 교체됐다면 새 emitter는 지우지 않는다.")
+    void sendToClient_FailedEmitterReplaced_KeepsNewEmitter() throws IOException {
+        // given
+        SseEmitter stale = mock(SseEmitter.class);
+        SseEmitter fresh = mock(SseEmitter.class);
+        doAnswer(invocation -> {
+            emitters.put(1L, fresh); // 전송 도중 재연결로 교체된 상황
+            throw new IOException("Broken pipe");
+        }).when(stale).send(any(SseEmitter.SseEventBuilder.class));
+        emitters.put(1L, stale);
+
+        // when
+        notificationService.sendToClient(1L, "알림");
+
+        // then
+        assertThat(emitters).containsEntry(1L, fresh);
     }
 
     @Test
