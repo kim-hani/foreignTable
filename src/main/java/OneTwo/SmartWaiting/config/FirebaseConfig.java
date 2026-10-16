@@ -3,11 +3,13 @@ package OneTwo.SmartWaiting.config;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 
 import javax.annotation.PostConstruct;
 import java.io.InputStream;
 
+@Slf4j
 @Configuration
 public class FirebaseConfig {
 
@@ -22,10 +24,10 @@ public class FirebaseConfig {
 
             if(FirebaseApp.getApps().isEmpty()){
                 FirebaseApp.initializeApp(options);
-                System.out.println("Firebase 푸시 알림 서버 연동 성공");
+                log.info("Firebase 푸시 알림 서버 연동 성공");
             }
         }catch(Exception e){
-            e.printStackTrace();
+            log.error("Firebase 초기화 실패", e);
         }
     }
 }

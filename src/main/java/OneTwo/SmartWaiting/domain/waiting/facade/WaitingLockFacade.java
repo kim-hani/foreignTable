@@ -1,5 +1,7 @@
 package OneTwo.SmartWaiting.domain.waiting.facade;
 
+import OneTwo.SmartWaiting.common.exception.BusinessException;
+import OneTwo.SmartWaiting.common.exception.ErrorCode;
 import OneTwo.SmartWaiting.domain.waiting.dto.requestDto.WaitingRegisterRequestDto;
 import OneTwo.SmartWaiting.domain.waiting.service.WaitingService;
 import lombok.RequiredArgsConstructor;
@@ -29,14 +31,14 @@ public class WaitingLockFacade {
             boolean isLocked = lock.tryLock(10, 5, TimeUnit.SECONDS); // 최대 10초 대기, 5초간 락 유지
             if (!isLocked) {
                 log.error("락 획득 실패 , 너무 많은 요청이 몰렸습니다. Key: {}", lockKey);
-                throw new RuntimeException("현재 대기 요청이 많아 처리가 지연되고 있습니다. 잠시 후 다시 시도해주세요.");
+                throw new BusinessException(ErrorCode.WAITING_LOCK_TIMEOUT);
             }
 
             return waitingService.registerWaiting(requestDto, email);
         } catch (InterruptedException e) {
             log.error("락 획득 중 예외 발생. Key: {}", e.getMessage());
             Thread.currentThread().interrupt();
-            throw new RuntimeException("시스템 오류가 발생했습니다.");
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
         } finally {
             if (lock.isLocked() && lock.isHeldByCurrentThread()) {
                 lock.unlock();
