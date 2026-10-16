@@ -22,7 +22,11 @@ public interface WaitingRepository extends JpaRepository<Waiting, Long> {
     @Query("SELECT w FROM Waiting w JOIN FETCH w.store WHERE w.member.id = :memberId ORDER BY w.createdAt DESC")
     List<Waiting> findAllByMemberId(@Param("memberId") Long memberId);
 
-    boolean existsByMemberIdAndStoreIdAndStatus(Long memberId, Long storeId, WaitingStatus status);
+    boolean existsByMemberIdAndStoreIdAndStatusIn(Long memberId, Long storeId, List<WaitingStatus> statuses);
+
+    // 영업일 내 해당 가게에서 마지막으로 발급된 대기 번호 (없으면 0). createdAt은 미루기에도 변하지 않으므로 발급 시각 기준으로 사용
+    @Query("SELECT COALESCE(MAX(w.queueNumber), 0) FROM Waiting w WHERE w.store.id = :storeId AND w.createdAt >= :since")
+    Integer findMaxQueueNumberSince(@Param("storeId") Long storeId, @Param("since") LocalDateTime since);
 
     Long countByStoreIdAndStatusAndTicketTimeLessThan(Long storeId, WaitingStatus status, LocalDateTime createdAt);
 

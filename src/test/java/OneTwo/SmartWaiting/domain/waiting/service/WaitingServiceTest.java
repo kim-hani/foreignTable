@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -33,6 +34,9 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -81,7 +85,7 @@ class WaitingServiceTest {
 
         Mockito.when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
         Mockito.when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
-        Mockito.when(waitingRepository.existsByMemberIdAndStoreIdAndStatus(100L, storeId, WaitingStatus.WAITING)).thenReturn(false);
+        Mockito.when(waitingRepository.existsByMemberIdAndStoreIdAndStatusIn(eq(100L), eq(storeId), any())).thenReturn(false);
         Mockito.when(waitingRepository.countByStoreIdAndStatusIn(eq(storeId), any())).thenReturn(5L);
 
         Waiting mockSavedWaiting = mock(Waiting.class);
@@ -168,7 +172,7 @@ class WaitingServiceTest {
         Member mockMember = mock(Member.class);
         Mockito.when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
         Mockito.when(mockMember.getId()).thenReturn(100L);
-        Mockito.when(waitingRepository.existsByMemberIdAndStoreIdAndStatus(100L, storeId, WaitingStatus.WAITING)).thenReturn(true);
+        Mockito.when(waitingRepository.existsByMemberIdAndStoreIdAndStatusIn(eq(100L), eq(storeId), any())).thenReturn(true);
 
         Assertions.assertThrows(BusinessException.class, () -> waitingService.registerWaiting(requestDto, email));
     }
@@ -192,7 +196,7 @@ class WaitingServiceTest {
 
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
         when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
-        when(waitingRepository.existsByMemberIdAndStoreIdAndStatus(100L, storeId, WaitingStatus.WAITING)).thenReturn(false);
+        when(waitingRepository.existsByMemberIdAndStoreIdAndStatusIn(eq(100L), eq(storeId), any())).thenReturn(false);
         when(waitingRepository.countByStoreIdAndStatusIn(eq(storeId), any())).thenReturn(3L);
 
         Waiting mockSaved = mock(Waiting.class);
@@ -225,7 +229,7 @@ class WaitingServiceTest {
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
         when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
         when(waitingRepository.countByStoreIdAndStatusIn(eq(storeId), any())).thenReturn(9L);
-        when(waitingRepository.existsByMemberIdAndStoreIdAndStatus(100L, storeId, WaitingStatus.WAITING)).thenReturn(false);
+        when(waitingRepository.existsByMemberIdAndStoreIdAndStatusIn(eq(100L), eq(storeId), any())).thenReturn(false);
 
         Waiting mockSaved = mock(Waiting.class);
         when(mockSaved.getId()).thenReturn(2L);
@@ -259,6 +263,131 @@ class WaitingServiceTest {
                 () -> waitingService.registerWaiting(requestDto, email));
 
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.WAITING_QUEUE_FULL);
+    }
+
+    private Store givenRegistrableStore(Long storeId, String email) {
+        Store mockStore = mock(Store.class);
+        when(mockStore.getId()).thenReturn(storeId);
+        when(mockStore.getAverageWaiting()).thenReturn(10);
+        when(mockStore.getIsAcceptingWaiting()).thenReturn(true);
+        when(mockStore.getMaxWaitingCount()).thenReturn(null);
+
+        Member mockMember = mock(Member.class);
+        when(mockMember.getId()).thenReturn(100L);
+
+        when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
+        when(waitingRepository.existsByMemberIdAndStoreIdAndStatusIn(eq(100L), eq(storeId), any())).thenReturn(false);
+        when(waitingRepository.save(any(Waiting.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        return mockStore;
+    }
+
+    @Test
+    @DisplayName("대기 번호 발급 - 앞 팀이 빠져 남은 팀 수가 줄어도 이미 발급된 번호를 재발급하지 않는다.")
+    void registerWaiting_QueueNumber_NotReusedAfterOthersLeave() {
+        // given: 오늘 5번까지 발급됐지만 지금 남은 팀은 1팀
+        String email = "test@gmail.com";
+        Long storeId = 1L;
+        givenRegistrableStore(storeId, email);
+        when(waitingRepository.countByStoreIdAndStatusIn(eq(storeId), any())).thenReturn(1L);
+        when(waitingRepository.findMaxQueueNumberSince(eq(storeId), any(LocalDateTime.class))).thenReturn(5);
+
+        // when
+        waitingService.registerWaiting(new WaitingRegisterRequestDto(storeId, 2), email);
+
+        // then: 2번(남은 팀 수 + 1)이 아니라 6번, 예상 대기는 앞 1팀 기준
+        ArgumentCaptor<Waiting> captor = ArgumentCaptor.forClass(Waiting.class);
+        verify(waitingRepository).save(captor.capture());
+        assertThat(captor.getValue().getQueueNumber()).isEqualTo(6);
+        assertThat(captor.getValue().getExpectedWaitMin()).isEqualTo(10);
+    }
+
+    @Test
+    @DisplayName("대기 번호 발급 - 영업일 첫 손님은 1번, 앞 팀이 없으므로 예상 대기는 0분이다.")
+    void registerWaiting_QueueNumber_FirstOfBusinessDayIsOne() {
+        // given
+        String email = "test@gmail.com";
+        Long storeId = 1L;
+        givenRegistrableStore(storeId, email);
+        when(waitingRepository.countByStoreIdAndStatusIn(eq(storeId), any())).thenReturn(0L);
+        when(waitingRepository.findMaxQueueNumberSince(eq(storeId), any(LocalDateTime.class))).thenReturn(0);
+
+        // when
+        waitingService.registerWaiting(new WaitingRegisterRequestDto(storeId, 2), email);
+
+        // then
+        ArgumentCaptor<Waiting> captor = ArgumentCaptor.forClass(Waiting.class);
+        verify(waitingRepository).save(captor.capture());
+        assertThat(captor.getValue().getQueueNumber()).isEqualTo(1);
+        assertThat(captor.getValue().getExpectedWaitMin()).isZero();
+    }
+
+    @Test
+    @DisplayName("3번째 안내 - 대기 번호와 무관하게 앞 팀이 2팀이면 등록 즉시 3번째 안내를 보낸다.")
+    void registerWaiting_ThirdInLineByTeamsAhead_SendsNotice() {
+        // given: 대기 번호는 8번이지만 앞에 2팀
+        String email = "test@gmail.com";
+        Long storeId = 1L;
+        givenRegistrableStore(storeId, email);
+        when(waitingRepository.countByStoreIdAndStatusIn(eq(storeId), any())).thenReturn(2L);
+        when(waitingRepository.findMaxQueueNumberSince(eq(storeId), any(LocalDateTime.class))).thenReturn(7);
+
+        // when
+        waitingService.registerWaiting(new WaitingRegisterRequestDto(storeId, 2), email);
+
+        // then
+        verify(notificationService).sendToClient(eq(100L), contains("3번째"));
+    }
+
+    @Test
+    @DisplayName("3번째 안내 - 대기 번호가 3번이어도 앞 팀이 2팀이 아니면 안내하지 않는다.")
+    void registerWaiting_QueueNumberThreeButNotThird_NoNotice() {
+        // given: 1·2번이 이미 입장해 앞 팀 0팀, 새 번호는 3번
+        String email = "test@gmail.com";
+        Long storeId = 1L;
+        givenRegistrableStore(storeId, email);
+        when(waitingRepository.countByStoreIdAndStatusIn(eq(storeId), any())).thenReturn(0L);
+        when(waitingRepository.findMaxQueueNumberSince(eq(storeId), any(LocalDateTime.class))).thenReturn(2);
+
+        // when
+        waitingService.registerWaiting(new WaitingRegisterRequestDto(storeId, 2), email);
+
+        // then
+        verify(notificationService, never()).sendToClient(anyLong(), anyString());
+    }
+
+    @Test
+    @DisplayName("영업일 경계 - 새벽 4시 이전은 전날 4시, 4시 이후는 당일 4시부터 번호를 이어서 발급한다.")
+    void businessDayStart_SplitsAtFourAm() {
+        assertThat(WaitingService.businessDayStart(LocalDateTime.of(2026, 10, 16, 3, 59)))
+                .isEqualTo(LocalDateTime.of(2026, 10, 15, 4, 0));
+        assertThat(WaitingService.businessDayStart(LocalDateTime.of(2026, 10, 16, 4, 0)))
+                .isEqualTo(LocalDateTime.of(2026, 10, 16, 4, 0));
+        assertThat(WaitingService.businessDayStart(LocalDateTime.of(2026, 10, 16, 23, 30)))
+                .isEqualTo(LocalDateTime.of(2026, 10, 16, 4, 0));
+    }
+
+    @Test
+    @DisplayName("중복 등록 - 대기 또는 호출 상태인 웨이팅이 있으면 WAITING/CALL 모두 기준으로 차단한다.")
+    void registerWaiting_ActiveIncludesCall_ChecksBothStatuses() {
+        // given
+        String email = "test@gmail.com";
+        Long storeId = 1L;
+        Store mockStore = mock(Store.class);
+        when(mockStore.getId()).thenReturn(storeId);
+        when(mockStore.getIsAcceptingWaiting()).thenReturn(true);
+        when(mockStore.getMaxWaitingCount()).thenReturn(null);
+        Member mockMember = mock(Member.class);
+        when(mockMember.getId()).thenReturn(100L);
+        when(storeRepository.findById(storeId)).thenReturn(Optional.of(mockStore));
+        when(memberRepository.findByEmail(email)).thenReturn(Optional.of(mockMember));
+        when(waitingRepository.existsByMemberIdAndStoreIdAndStatusIn(
+                100L, storeId, List.of(WaitingStatus.WAITING, WaitingStatus.CALL))).thenReturn(true);
+
+        // when & then
+        BusinessException exception = Assertions.assertThrows(BusinessException.class,
+                () -> waitingService.registerWaiting(new WaitingRegisterRequestDto(storeId, 2), email));
+        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.WAITING_ALREADY_EXISTS);
     }
 
     // ==================== cancelWaiting ====================

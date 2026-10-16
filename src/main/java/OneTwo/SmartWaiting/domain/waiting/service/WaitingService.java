@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -30,6 +31,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class WaitingService {
+
+    private static final List<WaitingStatus> ACTIVE_STATUSES = List.of(WaitingStatus.WAITING, WaitingStatus.CALL);
+
+    // 대기 번호 발급의 영업일 경계 — 새벽 4시 정리 배치(CleanupScheduler)가 남은 대기를 모두 종료하므로 같은 시각을 사용
+    static final LocalTime BUSINESS_DAY_START = LocalTime.of(4, 0);
 
     private final WaitingRepository waitingRepository;
     private final StoreRepository storeRepository;
@@ -50,26 +56,27 @@ public class WaitingService {
             throw new BusinessException(ErrorCode.STORE_NOT_ACCEPTING_WAITING);
         }
 
-        if (store.getMaxWaitingCount() != null) {
-            long activeCount = waitingRepository.countByStoreIdAndStatusIn(
-                    store.getId(), Arrays.asList(WaitingStatus.WAITING, WaitingStatus.CALL));
-            if (activeCount >= store.getMaxWaitingCount()) {
-                throw new BusinessException(ErrorCode.WAITING_QUEUE_FULL);
-            }
+        // 내 앞에 남아 있는 팀 수 (대기 + 호출)
+        long teamsAhead = waitingRepository.countByStoreIdAndStatusIn(store.getId(), ACTIVE_STATUSES);
+
+        if (store.getMaxWaitingCount() != null && teamsAhead >= store.getMaxWaitingCount()) {
+            throw new BusinessException(ErrorCode.WAITING_QUEUE_FULL);
         }
 
         if(member.isBlacklisted()){
             throw new BusinessException(ErrorCode.BLACKLISTED_MEMBER);
         }
 
-        if (waitingRepository.existsByMemberIdAndStoreIdAndStatus(member.getId(), store.getId(), WaitingStatus.WAITING)) {
+        // 호출(CALL)된 상태에서도 같은 가게에 중복 등록할 수 없음
+        if (waitingRepository.existsByMemberIdAndStoreIdAndStatusIn(member.getId(), store.getId(), ACTIVE_STATUSES)) {
             throw new BusinessException(ErrorCode.WAITING_ALREADY_EXISTS);
         }
 
-        long currentWaitingCount = waitingRepository.countByStoreIdAndStatusIn(
-                store.getId(), Arrays.asList(WaitingStatus.WAITING, WaitingStatus.CALL));
-        int myQueueNumber = (int) currentWaitingCount + 1;
-        int expectedWaitMin = myQueueNumber * store.getAverageWaiting();
+        // 대기 번호는 "남은 팀 수 + 1"이 아니라 영업일 내 마지막 발급 번호 + 1
+        // (남은 팀 수 기준이면 앞 팀이 입장·취소한 뒤 이미 발급된 번호가 다시 발급됨). 분산락 안에서 실행되므로 동시 발급 중복 없음
+        LocalDateTime now = LocalDateTime.now();
+        int myQueueNumber = waitingRepository.findMaxQueueNumberSince(store.getId(), businessDayStart(now)) + 1;
+        int expectedWaitMin = (int) teamsAhead * store.getAverageWaiting();
 
         Waiting waiting = Waiting.builder()
                 .store(store)
@@ -79,12 +86,13 @@ public class WaitingService {
                 .queueNumber(myQueueNumber)
                 .expectedWaitMin(expectedWaitMin)
                 .postponedCount(0)
-                .ticketTime(LocalDateTime.now())
+                .ticketTime(now)
                 .build();
 
         waiting = waitingRepository.save(waiting);
 
-        if (myQueueNumber == 3) {
+        // 순번(앞 팀 수 기준)이 3번째일 때 안내 — 대기 번호는 순번과 다를 수 있음
+        if (teamsAhead == 2) {
             notificationService.sendToClient(member.getId(), "📢 대기 순번이 3번째입니다! 매장 앞에서 대기해 주세요.");
         }
 
@@ -261,6 +269,11 @@ public class WaitingService {
                 : 0;
 
         return new WaitingStatusResponse(waiting.getStatus(), currentRank, teamsAhead, expectedWaitMin);
+    }
+
+    static LocalDateTime businessDayStart(LocalDateTime now) {
+        LocalDateTime todayStart = now.toLocalDate().atTime(BUSINESS_DAY_START);
+        return now.isBefore(todayStart) ? todayStart.minusDays(1) : todayStart;
     }
 
     boolean isTop2(Waiting waiting) {
