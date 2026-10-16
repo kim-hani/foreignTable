@@ -4,6 +4,7 @@ import OneTwo.SmartWaiting.common.exception.JwtAccessDeniedHandler;
 import OneTwo.SmartWaiting.common.exception.JwtAuthenticationEntryPoint;
 import OneTwo.SmartWaiting.domain.oauth.CustomOAuth2UserService;
 import OneTwo.SmartWaiting.domain.oauth.OAuth2SuccessHandler;
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -61,6 +62,9 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 세션 사용 안 함 (JWT 사용)
                 .authorizeHttpRequests(auth -> auth
+                        // SSE 종료 시 컨테이너가 보내는 ASYNC 재디스패치에는 JWT 필터가 다시 돌지 않아 인증 정보가 없음
+                        // — 최초 요청에서 이미 인가됐으므로 허용 (안 하면 연결 종료마다 AuthorizationDeniedException 발생)
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/", "/login/**", "/oauth2/**", "/error").permitAll() // 로그인 관련 페이지 허용
                         .requestMatchers("/api/v1/auth/**").permitAll()
