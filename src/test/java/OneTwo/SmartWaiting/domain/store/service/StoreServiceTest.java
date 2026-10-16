@@ -206,43 +206,63 @@ class StoreServiceTest {
     }
 
     @Test
-    @DisplayName("식당 카테고리로 검색 성공 (카테고리 있음 - Branch 커버리지)")
-    void searchStores_WithCategory_Success() {
+    @DisplayName("식당 검색 - 이름과 카테고리가 모두 있으면 두 조건 쿼리를 사용한다.")
+    void searchStores_NameAndCategory_UsesCombinedQuery() {
         // given
-        String keyword = "식당";
-        String category = "KOREAN"; // 카테고리 있음 분기
         Pageable pageable = PageRequest.of(0, 10);
-        Slice<Store> mockSlice = new SliceImpl<>(Collections.emptyList());
-
-        when(storeRepository.searchStoresByNameAndCategory(eq(keyword), any(StoreCategory.class), eq(pageable)))
-                .thenReturn(mockSlice);
+        when(storeRepository.findByIsDeletedFalseAndNameContainingAndCategory("식당", StoreCategory.KOREAN, pageable))
+                .thenReturn(new SliceImpl<>(Collections.emptyList()));
 
         // when
-        Slice<StoreResponseDto> result = storeService.searchStores(keyword, category, pageable);
+        Slice<StoreResponseDto> result = storeService.searchStores("식당", "KOREAN", pageable);
 
         // then
         assertThat(result).isNotNull();
-        verify(storeRepository, times(1)).searchStoresByNameAndCategory(eq(keyword), any(StoreCategory.class), eq(pageable));
+        verify(storeRepository, times(1)).findByIsDeletedFalseAndNameContainingAndCategory("식당", StoreCategory.KOREAN, pageable);
     }
 
     @Test
-    @DisplayName("식당 카테고리 없이 검색 성공 (카테고리 없음 - Branch 커버리지)")
-    void searchStores_WithoutCategory_Success() {
+    @DisplayName("식당 검색 - 이름만 있으면 이름 쿼리를 사용한다.")
+    void searchStores_NameOnly_UsesNameQuery() {
         // given
-        String keyword = "식당";
-        String category = null; // 카테고리 없음 분기
         Pageable pageable = PageRequest.of(0, 10);
-        Slice<Store> mockSlice = new SliceImpl<>(Collections.emptyList());
-
-        when(storeRepository.searchStoresByNameAndCategory(eq(keyword), isNull(), eq(pageable)))
-                .thenReturn(mockSlice);
+        when(storeRepository.findByIsDeletedFalseAndNameContaining("식당", pageable))
+                .thenReturn(new SliceImpl<>(Collections.emptyList()));
 
         // when
-        Slice<StoreResponseDto> result = storeService.searchStores(keyword, category, pageable);
+        storeService.searchStores("식당", null, pageable);
 
         // then
-        assertThat(result).isNotNull();
-        verify(storeRepository, times(1)).searchStoresByNameAndCategory(eq(keyword), isNull(), eq(pageable));
+        verify(storeRepository, times(1)).findByIsDeletedFalseAndNameContaining("식당", pageable);
+    }
+
+    @Test
+    @DisplayName("식당 검색 - 이름이 공백이고 카테고리만 있으면 카테고리 쿼리를 사용한다.")
+    void searchStores_BlankNameWithCategory_UsesCategoryQuery() {
+        // given
+        Pageable pageable = PageRequest.of(0, 10);
+        when(storeRepository.findByIsDeletedFalseAndCategory(StoreCategory.KOREAN, pageable))
+                .thenReturn(new SliceImpl<>(Collections.emptyList()));
+
+        // when
+        storeService.searchStores("  ", "KOREAN", pageable);
+
+        // then
+        verify(storeRepository, times(1)).findByIsDeletedFalseAndCategory(StoreCategory.KOREAN, pageable);
+    }
+
+    @Test
+    @DisplayName("식당 검색 - 조건이 없으면 삭제되지 않은 전체 식당을 조회한다.")
+    void searchStores_NoCondition_UsesAllActiveQuery() {
+        // given
+        Pageable pageable = PageRequest.of(0, 10);
+        when(storeRepository.findByIsDeletedFalse(pageable)).thenReturn(new SliceImpl<>(Collections.emptyList()));
+
+        // when
+        storeService.searchStores(null, null, pageable);
+
+        // then
+        verify(storeRepository, times(1)).findByIsDeletedFalse(pageable);
     }
 
     // ================= [ 식당 수정 (Update) ] =================
