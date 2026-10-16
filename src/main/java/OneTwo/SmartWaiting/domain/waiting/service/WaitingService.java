@@ -4,8 +4,6 @@ import OneTwo.SmartWaiting.common.exception.BusinessException;
 import OneTwo.SmartWaiting.common.exception.ErrorCode;
 import OneTwo.SmartWaiting.domain.member.entity.Member;
 import OneTwo.SmartWaiting.domain.member.repository.MemberRepository;
-import OneTwo.SmartWaiting.domain.notification.service.FcmService;
-import OneTwo.SmartWaiting.domain.notification.service.NotificationService;
 import OneTwo.SmartWaiting.domain.store.entity.Store;
 import OneTwo.SmartWaiting.domain.store.repository.StoreRepository;
 import OneTwo.SmartWaiting.domain.waiting.dto.requestDto.WaitingChangeRequestDto;
@@ -13,11 +11,13 @@ import OneTwo.SmartWaiting.domain.waiting.dto.requestDto.WaitingRegisterRequestD
 import OneTwo.SmartWaiting.domain.waiting.dto.responseDto.WaitingResponse;
 import OneTwo.SmartWaiting.domain.waiting.dto.responseDto.WaitingStatusResponse;
 import OneTwo.SmartWaiting.domain.waiting.entity.Waiting;
+import OneTwo.SmartWaiting.domain.waiting.event.WaitingConnectionCloseEvent;
+import OneTwo.SmartWaiting.domain.waiting.event.WaitingMessageEvent;
+import OneTwo.SmartWaiting.domain.waiting.event.WaitingQueueChangedEvent;
 import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
 import OneTwo.SmartWaiting.domain.waiting.repository.WaitingRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,8 +40,8 @@ public class WaitingService {
     private final WaitingRepository waitingRepository;
     private final StoreRepository storeRepository;
     private final MemberRepository memberRepository;
-    private final NotificationService notificationService;
-    private final FcmService fcmService;
+    // 알림은 직접 보내지 않고 이벤트로 발행 → 커밋 후 WaitingNotificationListener가 발송
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public Long registerWaiting(WaitingRegisterRequestDto requestDto, String email) {
@@ -93,7 +93,7 @@ public class WaitingService {
 
         // 순번(앞 팀 수 기준)이 3번째일 때 안내 — 대기 번호는 순번과 다를 수 있음
         if (teamsAhead == 2) {
-            notificationService.sendToClient(member.getId(), "📢 대기 순번이 3번째입니다! 매장 앞에서 대기해 주세요.");
+            eventPublisher.publishEvent(new WaitingMessageEvent(member.getId(), "📢 대기 순번이 3번째입니다! 매장 앞에서 대기해 주세요."));
         }
 
         return waiting.getId();
@@ -116,16 +116,8 @@ public class WaitingService {
 
         waiting.changeStatus(WaitingStatus.CANCEL);
 
-        waitingRepository.flush();
-
-        if (shouldNotify) {
-            checkAndNotifyThirdInLine(waiting.getStore().getId());
-        }
-        if (shouldNotifyFirst) {
-            checkAndNotifyFirstInLine(waiting.getStore().getId());
-        }
-
-        notificationService.closeConnection(waiting.getMember().getId());
+        publishQueueChanged(waiting.getStore().getId(), shouldNotify, shouldNotifyFirst);
+        eventPublisher.publishEvent(new WaitingConnectionCloseEvent(waiting.getMember().getId()));
     }
 
     public List<WaitingResponse> getMyWaitings(String email) {
@@ -188,22 +180,15 @@ public class WaitingService {
             waiting.getMember().incrementNoShowCount();
         }
 
-        waitingRepository.flush();
-
         switch (request.status()) {
             case CALL:
-                notificationService.sendToClient(waiting.getMember().getId(), "📢 사장님이 호출하셨습니다! 매장으로 입장해 주세요.");
+                eventPublisher.publishEvent(new WaitingMessageEvent(waiting.getMember().getId(), "📢 사장님이 호출하셨습니다! 매장으로 입장해 주세요."));
                 break;
             case SEATED:
             case CANCEL:
             case NOSHOW:
-                if (shouldNotify) {
-                    checkAndNotifyThirdInLine(waiting.getStore().getId());
-                }
-                if (shouldNotifyFirst) {
-                    checkAndNotifyFirstInLine(waiting.getStore().getId());
-                }
-                notificationService.closeConnection(waiting.getMember().getId());
+                publishQueueChanged(waiting.getStore().getId(), shouldNotify, shouldNotifyFirst);
+                eventPublisher.publishEvent(new WaitingConnectionCloseEvent(waiting.getMember().getId()));
                 break;
             default:
                 break;
@@ -231,14 +216,7 @@ public class WaitingService {
 
         waiting.postpone();
 
-        waitingRepository.flush();
-
-        if (shouldNotify) {
-            checkAndNotifyThirdInLine(waiting.getStore().getId());
-        }
-        if (shouldNotifyFirst) {
-            checkAndNotifyFirstInLine(waiting.getStore().getId());
-        }
+        publishQueueChanged(waiting.getStore().getId(), shouldNotify, shouldNotifyFirst);
     }
 
     public WaitingStatusResponse getWaitingStatus(Long waitingId, String email) {
@@ -305,34 +283,10 @@ public class WaitingService {
         return teamsAhead < 3;
     }
 
-    private void checkAndNotifyFirstInLine(Long storeId) {
-        PageRequest pageRequest = PageRequest.of(0, 1);
-        Page<Waiting> firstWaitingPage = waitingRepository.findByStoreIdAndStatusOrderByTicketTimeAsc(
-                storeId, WaitingStatus.WAITING, pageRequest
-        );
-
-        if (firstWaitingPage.hasContent()) {
-            Waiting firstWaiting = firstWaitingPage.getContent().get(0);
-            Long memberId = firstWaiting.getMember().getId();
-            String fcmToken = firstWaiting.getMember().getFcmToken();
-
-            notificationService.sendToClient(memberId, "🚨 곧 입장하실 차례입니다! 매장 앞에 대기해 주세요.");
-            fcmService.sendFirstInLinePush(fcmToken, storeId);
-        }
-    }
-
-    private void checkAndNotifyThirdInLine(Long storeId) {
-        PageRequest pageRequest = PageRequest.of(2, 1);
-        Page<Waiting> thirdWaitingPage = waitingRepository.findByStoreIdAndStatusOrderByTicketTimeAsc(
-                storeId, WaitingStatus.WAITING, pageRequest
-        );
-
-        if (thirdWaitingPage.hasContent()) {
-            Waiting thirdWaiting = thirdWaitingPage.getContent().get(0);
-            Long memberId = thirdWaiting.getMember().getId();
-
-            String message = "📢 대기 순번이 3번째입니다! 매장 앞에서 대기해 주세요.";
-            notificationService.sendToClient(memberId, message);
+    // 새 3번째·1번째 조회와 알림은 커밋된 대기열 기준으로 해야 하므로 커밋 후 리스너에서 수행
+    private void publishQueueChanged(Long storeId, boolean notifyThird, boolean notifyFirst) {
+        if (notifyThird || notifyFirst) {
+            eventPublisher.publishEvent(new WaitingQueueChangedEvent(storeId, notifyThird, notifyFirst));
         }
     }
 }
