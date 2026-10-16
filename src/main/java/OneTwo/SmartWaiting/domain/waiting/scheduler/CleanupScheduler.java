@@ -1,5 +1,6 @@
 package OneTwo.SmartWaiting.domain.waiting.scheduler;
 
+import OneTwo.SmartWaiting.common.scheduler.SchedulerLock;
 import OneTwo.SmartWaiting.domain.notification.service.NotificationService;
 import OneTwo.SmartWaiting.domain.store.repository.StoreRepository;
 import OneTwo.SmartWaiting.domain.store.service.StoreStatisticService;
@@ -12,6 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
@@ -24,10 +26,18 @@ public class CleanupScheduler {
     private final WaitingRepository waitingRepository;
     private final NotificationService notificationService;
     private final StoreStatisticService storeStatisticService;
+    private final SchedulerLock schedulerLock;
+
+    // 하루 1회 작업이므로 넉넉히 점유해 다른 인스턴스의 중복 실행 차단
+    private static final Duration LOCK_HOLD = Duration.ofMinutes(30);
 
     @Scheduled(cron = "0 0 4 * * ?")  // 매일 새벽 4시에 실행
     @Transactional
     public void cleanupGhostWaitings(){
+        if (!schedulerLock.tryAcquire("cleanupGhostWaitings", LOCK_HOLD)) {
+            return;
+        }
+
         log.info("유령 웨이팅 정리 작업 시작");
 
         List<Waiting> ghostWaitings = waitingRepository.findAllByStatusIn(

@@ -1,5 +1,6 @@
 package OneTwo.SmartWaiting.domain.notification.scheduler;
 
+import OneTwo.SmartWaiting.common.scheduler.SchedulerLock;
 import OneTwo.SmartWaiting.domain.member.entity.Member;
 import OneTwo.SmartWaiting.domain.notification.service.FcmService;
 import OneTwo.SmartWaiting.domain.waiting.entity.Waiting;
@@ -11,6 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -22,11 +24,19 @@ public class ReviewNotificationScheduler {
 
     private final WaitingRepository waitingRepository;
     private final FcmService fcmService;
+    private final SchedulerLock schedulerLock;
+
+    // 매분 실행되므로 1분보다 짧게 점유 → 같은 분에는 한 인스턴스만, 다음 분에는 다시 실행 가능
+    private static final Duration LOCK_HOLD = Duration.ofSeconds(50);
 
     // 매분 0초마다 자동 실행 (1시간 전 입장객 찾기)
     @Scheduled(cron = "0 * * * * *")
     @Transactional(readOnly = true)
     public void sendReviewRequestNotifications() {
+        if (!schedulerLock.tryAcquire("sendReviewRequestNotifications", LOCK_HOLD)) {
+            return;
+        }
+
         // 분 단위로 절삭해 실행 지연(ms)이 있어도 매분 구간이 빈틈·중복 없이 이어지도록 함
         LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
         LocalDateTime start = now.minusMinutes(61);
