@@ -42,7 +42,7 @@ class ReviewNotificationSchedulerTest {
     private FcmService fcmService;
 
     @Test
-    @DisplayName("조회 구간 - 분 단위로 절삭된 1분짜리 [start, end) 구간으로 SEATED 웨이팅을 조회한다.")
+    @DisplayName("조회 구간 - 분 단위로 정렬된 1분짜리 [start, end) 구간으로 SEATED 웨이팅을 조회한다.")
     void sendReviewRequestNotifications_QueriesMinuteAlignedOneMinuteWindow() {
         // given
         ArgumentCaptor<LocalDateTime> startCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
@@ -62,6 +62,24 @@ class ReviewNotificationSchedulerTest {
         assertThat(start.getSecond()).isZero();
         assertThat(start.getNano()).isZero();
         assertThat(end).isBeforeOrEqualTo(before.minusMinutes(59));
+    }
+
+    @Test
+    @DisplayName("시각 정렬 - cron이 조금 일찍 실행돼도 의도한 분으로 반올림한다.")
+    void alignToMinute_EarlyFire_RoundsUpToIntendedMinute() {
+        LocalDateTime early = LocalDateTime.of(2026, 10, 16, 18, 3, 59, 869_000_000);
+
+        assertThat(ReviewNotificationScheduler.alignToMinute(early))
+                .isEqualTo(LocalDateTime.of(2026, 10, 16, 18, 4));
+    }
+
+    @Test
+    @DisplayName("시각 정렬 - cron이 조금 늦게 실행돼도 의도한 분으로 내림한다.")
+    void alignToMinute_LateFire_RoundsDownToIntendedMinute() {
+        LocalDateTime late = LocalDateTime.of(2026, 10, 16, 18, 4, 0, 244_000_000);
+
+        assertThat(ReviewNotificationScheduler.alignToMinute(late))
+                .isEqualTo(LocalDateTime.of(2026, 10, 16, 18, 4));
     }
 
     @Test

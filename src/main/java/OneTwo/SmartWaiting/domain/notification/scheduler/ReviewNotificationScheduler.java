@@ -27,8 +27,7 @@ public class ReviewNotificationScheduler {
     @Scheduled(cron = "0 * * * * *")
     @Transactional(readOnly = true)
     public void sendReviewRequestNotifications() {
-        // 분 단위로 절삭해 실행 지연(ms)이 있어도 매분 구간이 빈틈·중복 없이 이어지도록 함
-        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
+        LocalDateTime now = alignToMinute(LocalDateTime.now());
         LocalDateTime start = now.minusMinutes(61);
         LocalDateTime end = now.minusMinutes(60);
 
@@ -48,5 +47,11 @@ public class ReviewNotificationScheduler {
                     waiting.getStore().getId() // 프론트엔드가 사용할 가게 ID 데이터
             );
         }
+    }
+
+    // 가장 가까운 분으로 반올림 → cron이 시계 오차로 조금 일찍(예: 59.9초) 또는 늦게 실행돼도
+    // 의도한 분으로 맞춰 매분 구간이 빈틈·중복 없이 이어지도록 함 (절삭하면 일찍 실행 시 한 분 전 구간을 재조회)
+    static LocalDateTime alignToMinute(LocalDateTime time) {
+        return time.plusSeconds(30).truncatedTo(ChronoUnit.MINUTES);
     }
 }
