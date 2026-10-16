@@ -1,6 +1,8 @@
 package OneTwo.SmartWaiting.domain.waiting.entity;
 
 import OneTwo.SmartWaiting.common.domain.BaseEntity;
+import OneTwo.SmartWaiting.common.exception.BusinessException;
+import OneTwo.SmartWaiting.common.exception.ErrorCode;
 import OneTwo.SmartWaiting.domain.member.entity.Member;
 import OneTwo.SmartWaiting.domain.store.entity.Store;
 import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
@@ -51,7 +53,7 @@ public class Waiting extends BaseEntity {
 
     public void postpone(){
         if(this.postponedCount >= 2){
-            throw new IllegalStateException("더 이상 대기 순서를 미룰 수 없습니다.");
+            throw new BusinessException(ErrorCode.POSTPONE_LIMIT_EXCEEDED);
         }
         this.postponedCount++;
         this.ticketTime = LocalDateTime.now();
