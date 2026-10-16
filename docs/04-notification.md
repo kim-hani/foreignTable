@@ -239,16 +239,16 @@ private void checkAndNotifyThirdInLine(Long storeId) {
 상태 변경 전에 isTop3 / isTop2 판정 (변경 후엔 이미 빠져서 판정 불가)
   │
   ▼
-실제 상태 변경 + flush()  ★ DB 반영 보장
+실제 상태 변경 + WaitingQueueChangedEvent 발행 (트랜잭션 안에서는 발행만)
   │
-  ▼
-shouldNotify(isTop3)면 → 새 3번째 손님 조회 후 알림
-shouldNotifyFirst(isTop2)면 → 새 1번째 손님 조회 후 알림
+  ▼ 커밋 성공 후 WaitingNotificationListener (AFTER_COMMIT, 새 읽기 트랜잭션)
+notifyThird(isTop3)면 → 새 3번째 손님 조회 후 알림
+notifyFirst(isTop2)면 → 새 1번째 손님 조회 후 SSE + FCM 알림
 ```
 
 **핵심**: "내가 상위 1~3등에 있었다가 빠진 경우에만" 알림. 뒤쪽 손님이 빠지면 순서 변동이 없으므로 알림하지 않음 → **불필요한 알림 최소화**. (상세 판정 로직은 [03-waiting](./03-waiting.md) §8)
 
-> ⚠️ `flush()` 순서 보장은 알림 정확성의 핵심. 상태 변경이 DB에 반영된 후 조회해야 올바른 대상이 잡힘.
+> ⚠️ 알림은 커밋된 뒤에만 나간다. 롤백되면 발송되지 않고, 새 대상 조회도 커밋된 대기열 기준이라 올바른 대상이 잡힌다.
 
 ---
 

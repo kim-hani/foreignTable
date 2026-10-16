@@ -259,9 +259,9 @@ public WaitingStatusResponse getWaitingStatus(Long waitingId, String email) {
   │
   ▼ NOSHOW면 → member.incrementNoShowCount()  (블랙리스트 누적)
   │
-  ▼ waitingRepository.flush()  ★ DB 반영 강제 (알림 전 필수)
+  ▼ 상태별 알림 이벤트 발행 (트랜잭션 안에서는 발행만)
   │
-  ▼ 상태별 후속 알림 분기:
+  ▼ 커밋 성공 후 WaitingNotificationListener(AFTER_COMMIT)가 발송:
      ├─ CALL  → 해당 손님에게 SSE "사장님이 호출하셨습니다!"
      └─ SEATED/CANCEL/NOSHOW (이탈) →
           ├─ 앞자리 변동 발생 → 새 3번째 손님에게 SSE 알림
@@ -272,14 +272,14 @@ public WaitingStatusResponse getWaitingStatus(Long waitingId, String email) {
 **흐름 설명** — 가장 까다로운 점은 **알림 대상을 변경 "전"에 미리 판정**한다는 것이다(`isTop3`/`isTop2`). 상태를 바꾸고 나면 그 손님은 이미 대기열에서 빠져 "원래 상위권이었는지"를 되짚을 수 없기 때문:
 
 - **① 사전 판정**: 변경 전에 변동 영향 여부(상위권 이탈인지)를 미리 기억해 둔다.
-- **② 상태 변경 + flush()**: 상태를 바꾼 뒤 `flush()`로 DB에 확정한다.
-- **③ 새 대상 조회·알림**: 그 시점의 대기열을 다시 조회해 새 1·3번째 손님에게 알린다.
+- **② 상태 변경 + 이벤트 발행**: 상태를 바꾸고 알림 이벤트를 발행한다. 이 시점엔 아무것도 보내지 않는다.
+- **③ 커밋 후 새 대상 조회·알림**: 커밋이 성공하면 리스너가 새 트랜잭션에서 커밋된 대기열을 다시 조회해 새 1·3번째 손님에게 알린다. 롤백되면 알림은 나가지 않는다.
 - **알림 분기**: CALL(호출)은 순서 변동이 아니라 그 손님 **본인**에게, SEATED/CANCEL/NOSHOW는 상위권 이탈이라 **뒷사람**(새 1·3번째)에게 보낸다.
 
 > 자세한 판정 로직은 §8 참고.
 
-### ⚠️ `flush()`가 필수인 이유
-알림은 "현재 대기열 순서"를 다시 조회해 대상을 찾습니다. 상태 변경이 **DB에 반영되기 전**에 알림 로직이 돌면, 방금 이탈한 사람이 여전히 대기열에 있는 것으로 잡혀 **잘못된 대상에게 알림**이 갑니다. 따라서 `flush()`로 변경을 먼저 DB에 밀어넣은 뒤 알림을 보냅니다.
+### ⚠️ 알림을 커밋 후에 보내는 이유
+알림은 "현재 대기열 순서"를 다시 조회해 대상을 찾습니다. 예전에는 트랜잭션 안에서 `flush()` 후 바로 보냈는데, 이러면 (1) 커밋이 실패·롤백돼도 알림은 이미 나가고, (2) 커밋 전이라 손님이 알림을 받고 조회했을 때 아직 바뀐 상태가 보이지 않을 수 있습니다. 그래서 상태 변경은 이벤트로만 발행하고, `WaitingNotificationListener`가 `@TransactionalEventListener(AFTER_COMMIT)`로 **커밋된 뒤에** 대기열을 다시 조회해 알립니다. 같은 트랜잭션에서 발행한 이벤트는 발행 순서대로 처리됩니다 (예: 안내 메시지 → 연결 종료).
 
 > 자세한 알림 로직은 [04-notification](./04-notification.md) 참고.
 
@@ -289,8 +289,8 @@ public WaitingStatusResponse getWaitingStatus(Long waitingId, String email) {
 
 ### 6.1 취소 — `PATCH /api/v1/waitings/{id}/cancel`
 ```
-본인 확인 → 알림대상 사전판정 → status=CANCEL → flush()
-  → (이탈로 인한) 3번째·1번째 손님 알림 → 본인 SSE 연결 종료
+본인 확인 → 알림대상 사전판정 → status=CANCEL → 알림 이벤트 발행
+  → (커밋 후) 이탈로 인한 3번째·1번째 손님 알림 → 본인 SSE 연결 종료
 ```
 
 ### 6.2 미루기 — `PATCH /api/v1/waitings/{id}/postpone`
@@ -300,8 +300,8 @@ public WaitingStatusResponse getWaitingStatus(Long waitingId, String email) {
   → 알림대상 사전판정
   → waiting.postpone()  ── postponedCount++, ticketTime=now (맨 뒤로)
        └─ 이미 2회 미뤘으면 BusinessException(POSTPONE_LIMIT_EXCEEDED)
-  → flush()
-  → 내가 빠진 자리의 3번째·1번째 손님에게 알림
+  → 알림 이벤트 발행
+  → (커밋 후) 내가 빠진 자리의 3번째·1번째 손님에게 알림
 ```
 
 > **미루기 제한 2회**: 무한 미루기로 다른 손님이 피해보는 것을 방지.
