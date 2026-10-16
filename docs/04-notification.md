@@ -46,12 +46,19 @@ public class NotificationService {
     // 회원ID → 연결(emitter) 매핑 (동시성 안전)
     private final Map<Long, SseEmitter> emitters = new ConcurrentHashMap<>();
 
-    public SseEmitter subscribe(Long memberId) {
-        SseEmitter emitter = new SseEmitter(60 * 1000L * 60);  // 60분 타임아웃
-        emitters.put(memberId, emitter);
+    public SseEmitter subscribe(String email) {  // email = JWT 인증 사용자
+        Long memberId = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND))
+                .getId();
 
-        emitter.onCompletion(() -> emitters.remove(memberId));  // 정상 종료 시 정리
-        emitter.onTimeout(() -> emitters.remove(memberId));      // 타임아웃 시 정리
+        SseEmitter emitter = new SseEmitter(60 * 1000L * 60);  // 60분 타임아웃
+        SseEmitter previous = emitters.put(memberId, emitter);
+        if (previous != null) previous.complete();             // 재연결 시 이전 연결 종료
+
+        // (key, value) 일치 시에만 삭제 → 이전 연결의 콜백이 새 연결을 지우지 않음
+        emitter.onCompletion(() -> emitters.remove(memberId, emitter));
+        emitter.onTimeout(() -> emitters.remove(memberId, emitter));
+        emitter.onError(e -> emitters.remove(memberId, emitter));
 
         // 503 방지용 더미 이벤트 즉시 발송 (연결 확립)
         sendToClient(memberId, "EventStream Created. [userId=" + memberId + "]");
@@ -64,15 +71,16 @@ public class NotificationService {
 
 ```
 클라이언트
-  │  GET /api/v1/notifications/subscribe/{memberId}
-  │  (Accept: text/event-stream)
+  │  GET /api/v1/notifications/subscribe
+  │  (Accept: text/event-stream, Authorization: Bearer <JWT>)
   ▼
-NotificationController.subscribe()
+NotificationController.subscribe(principal)
   ▼
-NotificationService.subscribe(memberId)
+NotificationService.subscribe(email)
+  ├─ email → memberId 조회 (경로 파라미터를 믿지 않음 → 타인 알림 가로채기 방지)
   ├─ SseEmitter 생성 (60분 타임아웃)
-  ├─ emitters 맵에 등록
-  ├─ 연결 종료/타임아웃 시 자동 제거 콜백 등록
+  ├─ emitters 맵에 등록 (기존 연결이 있으면 complete()로 종료)
+  ├─ 연결 종료/타임아웃/에러 시 자동 제거 콜백 등록
   └─ 더미 이벤트 발송 (연결 확립 확인)
   ▼
 이후 서버 이벤트 발생 시 emitter.send()로 실시간 push
@@ -314,7 +322,7 @@ public void sendReviewRequestNotifications() {
 
 | 엔드포인트 | 메서드 | 설명 |
 |---|---|---|
-| `/api/v1/notifications/subscribe/{memberId}` | GET (SSE) | 실시간 알림 구독 연결 |
+| `/api/v1/notifications/subscribe` | GET (SSE) | 실시간 알림 구독 연결 (JWT 인증 사용자 기준) |
 
 > 나머지 알림은 웨이팅 상태 변경·스케줄러에서 **자동 발송**되며 별도 API가 없음.
 

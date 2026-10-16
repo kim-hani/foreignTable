@@ -1,5 +1,9 @@
 package OneTwo.SmartWaiting.domain.notification.service;
 
+import OneTwo.SmartWaiting.common.exception.BusinessException;
+import OneTwo.SmartWaiting.common.exception.ErrorCode;
+import OneTwo.SmartWaiting.domain.member.repository.MemberRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -11,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class NotificationService {
 
     // nginx/ALB 기본 idle timeout(60초)보다 짧게 설정
@@ -19,8 +24,14 @@ public class NotificationService {
     // 현재 연결된 사용자들의 SseEmitter를 저장하는 안전한 Map (동시성 방어)
     private final Map<Long, SseEmitter> emitters = new ConcurrentHashMap<>();
 
-    // 1. 클라이언트가 구독을 요청할 때 실행되는 메서드
-    public SseEmitter subscribe(Long memberId) {
+    private final MemberRepository memberRepository;
+
+    // 1. 클라이언트가 구독을 요청할 때 실행되는 메서드 (email = JWT 인증 사용자)
+    public SseEmitter subscribe(String email) {
+        Long memberId = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND))
+                .getId();
+
         // 타임아웃 설정: 60분 (밀리초 단위)
         SseEmitter emitter = new SseEmitter(60 * 1000L * 60);
         SseEmitter previous = emitters.put(memberId, emitter);
