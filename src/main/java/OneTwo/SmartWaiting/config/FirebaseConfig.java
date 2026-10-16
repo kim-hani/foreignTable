@@ -6,7 +6,7 @@ import com.google.firebase.FirebaseOptions;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import java.io.InputStream;
 
 @Slf4j
@@ -15,9 +15,7 @@ public class FirebaseConfig {
 
     @PostConstruct
     public void init(){
-        try{
-            InputStream serviceAccount = getClass().getResourceAsStream("/firebase-service-account.json");
-
+        try(InputStream serviceAccount = getClass().getResourceAsStream("/firebase-service-account.json")){
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
                     .build();
