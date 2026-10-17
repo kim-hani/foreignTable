@@ -4,14 +4,15 @@ import OneTwo.SmartWaiting.common.exception.BusinessException;
 import OneTwo.SmartWaiting.common.exception.ErrorCode;
 import OneTwo.SmartWaiting.domain.member.entity.Member;
 import OneTwo.SmartWaiting.domain.member.repository.MemberRepository;
-import OneTwo.SmartWaiting.domain.notification.service.FcmService;
-import OneTwo.SmartWaiting.domain.notification.service.NotificationService;
 import OneTwo.SmartWaiting.domain.store.entity.Store;
 import OneTwo.SmartWaiting.domain.store.repository.StoreRepository;
 import OneTwo.SmartWaiting.domain.waiting.dto.requestDto.WaitingChangeRequestDto;
 import OneTwo.SmartWaiting.domain.waiting.dto.requestDto.WaitingRegisterRequestDto;
 import OneTwo.SmartWaiting.domain.waiting.dto.responseDto.WaitingResponse;
 import OneTwo.SmartWaiting.domain.waiting.entity.Waiting;
+import OneTwo.SmartWaiting.domain.waiting.event.WaitingConnectionCloseEvent;
+import OneTwo.SmartWaiting.domain.waiting.event.WaitingMessageEvent;
+import OneTwo.SmartWaiting.domain.waiting.event.WaitingQueueChangedEvent;
 import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
 import OneTwo.SmartWaiting.domain.waiting.repository.WaitingRepository;
 import org.junit.jupiter.api.Assertions;
@@ -23,9 +24,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -56,10 +55,7 @@ class WaitingServiceTest {
     private MemberRepository memberRepository;
 
     @Mock
-    private NotificationService notificationService;
-
-    @Mock
-    private FcmService fcmService;
+    private ApplicationEventPublisher eventPublisher;
 
     // ==================== registerWaiting ====================
 
@@ -336,7 +332,8 @@ class WaitingServiceTest {
         waitingService.registerWaiting(new WaitingRegisterRequestDto(storeId, 2), email);
 
         // then
-        verify(notificationService).sendToClient(eq(100L), contains("3번째"));
+        verify(eventPublisher).publishEvent(argThat((Object e) ->
+                e instanceof WaitingMessageEvent m && m.memberId().equals(100L) && m.message().contains("3번째")));
     }
 
     @Test
@@ -353,7 +350,7 @@ class WaitingServiceTest {
         waitingService.registerWaiting(new WaitingRegisterRequestDto(storeId, 2), email);
 
         // then
-        verify(notificationService, never()).sendToClient(anyLong(), anyString());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -417,7 +414,7 @@ class WaitingServiceTest {
     }
 
     @Test
-    @DisplayName("웨이팅 취소 성공 - 1등이 취소하면 새로운 1등에게 SSE·FCM 알림이 발송된다")
+    @DisplayName("웨이팅 취소 성공 - 1등이 취소하면 새 1등 알림 이벤트를 발행하고 본인 연결 종료를 요청한다")
     void cancelWaiting_Success_FirstInLineNotified() {
         Long waitingId = 1L;
         String email = "first@gmail.com";
@@ -437,31 +434,17 @@ class WaitingServiceTest {
         // 내가 1등 (앞에 0팀) → isTop3=true, isTop2=true
         when(waitingRepository.countByStoreIdAndStatusInAndTicketTimeLessThan(any(), any(), any())).thenReturn(0L);
 
-        // checkAndNotifyThirdInLine: offset=2 → 빈 결과
-        when(waitingRepository.findByStoreIdAndStatusOrderByTicketTimeAsc(
-                eq(storeId), eq(WaitingStatus.WAITING),
-                argThat(p -> p.getOffset() == 2)))
-                .thenReturn(Page.empty());
 
-        // checkAndNotifyFirstInLine: offset=0 → 새 1등
-        Waiting newFirst = mock(Waiting.class);
-        Member newFirstMember = mock(Member.class);
-        when(newFirstMember.getId()).thenReturn(200L);
-        when(newFirstMember.getFcmToken()).thenReturn("fcm-token-200");
-        when(newFirst.getMember()).thenReturn(newFirstMember);
-        when(waitingRepository.findByStoreIdAndStatusOrderByTicketTimeAsc(
-                eq(storeId), eq(WaitingStatus.WAITING),
-                argThat(p -> p.getOffset() == 0)))
-                .thenReturn(new PageImpl<>(List.of(newFirst)));
 
         waitingService.cancelWaiting(waitingId, email);
 
-        verify(notificationService, times(1)).sendToClient(eq(200L), any());
-        verify(fcmService, times(1)).sendFirstInLinePush(eq("fcm-token-200"), eq(storeId));
+        // 새 3번째·1번째 알림은 커밋 후 리스너가 처리하도록 이벤트로 발행, 취소한 본인 연결은 종료
+        verify(eventPublisher).publishEvent(new WaitingQueueChangedEvent(storeId, true, true));
+        verify(eventPublisher).publishEvent(new WaitingConnectionCloseEvent(100L));
     }
 
     @Test
-    @DisplayName("웨이팅 취소 성공 - 2등 이하가 취소하면 1등에게 알림이 발송되지 않는다")
+    @DisplayName("웨이팅 취소 성공 - 2등이 취소하면 새 3번째 알림만 요청하고 1등 알림은 요청하지 않는다")
     void cancelWaiting_Success_NoFirstAlert_WhenNotFirst() {
         Long waitingId = 1L;
         String email = "second@gmail.com";
@@ -481,14 +464,10 @@ class WaitingServiceTest {
         // 내가 2등 (앞에 1팀) → isTop3=true, isTop2=false
         when(waitingRepository.countByStoreIdAndStatusInAndTicketTimeLessThan(any(), any(), any())).thenReturn(1L);
 
-        // checkAndNotifyThirdInLine: offset=2 → 빈 결과
-        when(waitingRepository.findByStoreIdAndStatusOrderByTicketTimeAsc(
-                eq(storeId), eq(WaitingStatus.WAITING), any(Pageable.class)))
-                .thenReturn(Page.empty());
 
         waitingService.cancelWaiting(waitingId, email);
 
-        verify(fcmService, never()).sendFirstInLinePush(any(), any());
+        verify(eventPublisher).publishEvent(new WaitingQueueChangedEvent(storeId, true, false));
     }
 
     @Test
@@ -554,7 +533,7 @@ class WaitingServiceTest {
     }
 
     @Test
-    @DisplayName("웨이팅 상태 변경 성공 - 1등 착석 시 새로운 1등에게 SSE·FCM 알림 발송")
+    @DisplayName("웨이팅 상태 변경 성공 - 1등 착석 시 새 1등 알림 이벤트를 발행하고 연결 종료를 요청한다")
     void changeStatus_Success_FirstInLineNotified_WhenSeated() {
         Long waitingId = 1L;
         String email = "owner@gmail.com";
@@ -576,27 +555,12 @@ class WaitingServiceTest {
         // 대상이 1등 (teamsAhead == 0) → isTop3=true, isTop2=true
         when(waitingRepository.countByStoreIdAndStatusInAndTicketTimeLessThan(any(), any(), any())).thenReturn(0L);
 
-        // checkAndNotifyThirdInLine: offset=2 → 빈 결과
-        when(waitingRepository.findByStoreIdAndStatusOrderByTicketTimeAsc(
-                eq(storeId), eq(WaitingStatus.WAITING),
-                argThat(p -> p.getOffset() == 2)))
-                .thenReturn(Page.empty());
 
-        // checkAndNotifyFirstInLine: offset=0 → 새 1등
-        Waiting newFirst = mock(Waiting.class);
-        Member newFirstMember = mock(Member.class);
-        when(newFirstMember.getId()).thenReturn(300L);
-        when(newFirstMember.getFcmToken()).thenReturn("token-300");
-        when(newFirst.getMember()).thenReturn(newFirstMember);
-        when(waitingRepository.findByStoreIdAndStatusOrderByTicketTimeAsc(
-                eq(storeId), eq(WaitingStatus.WAITING),
-                argThat(p -> p.getOffset() == 0)))
-                .thenReturn(new PageImpl<>(List.of(newFirst)));
 
         waitingService.changeStatus(waitingId, requestDto, email);
 
-        verify(notificationService, times(1)).sendToClient(eq(300L), any());
-        verify(fcmService, times(1)).sendFirstInLinePush(eq("token-300"), eq(storeId));
+        verify(eventPublisher).publishEvent(new WaitingQueueChangedEvent(storeId, true, true));
+        verify(eventPublisher).publishEvent(new WaitingConnectionCloseEvent(200L));
     }
 
     @Test
@@ -648,7 +612,7 @@ class WaitingServiceTest {
     }
 
     @Test
-    @DisplayName("웨이팅 미루기 성공 - 1등이 미루면 새로운 1등에게 SSE·FCM 알림 발송")
+    @DisplayName("웨이팅 미루기 성공 - 1등이 미루면 새 1등 알림 이벤트를 발행한다")
     void postponeWaiting_Success_FirstInLineNotified() {
         Long waitingId = 1L;
         String email = "test@gmail.com";
@@ -668,28 +632,13 @@ class WaitingServiceTest {
         // 내가 1등 → isTop3=true, isTop2=true
         when(waitingRepository.countByStoreIdAndStatusInAndTicketTimeLessThan(any(), any(), any())).thenReturn(0L);
 
-        // checkAndNotifyThirdInLine: offset=2 → 빈 결과
-        when(waitingRepository.findByStoreIdAndStatusOrderByTicketTimeAsc(
-                eq(storeId), eq(WaitingStatus.WAITING),
-                argThat(p -> p.getOffset() == 2)))
-                .thenReturn(Page.empty());
 
-        // checkAndNotifyFirstInLine: offset=0 → 새 1등 (FCM 토큰 없음)
-        Waiting newFirst = mock(Waiting.class);
-        Member newFirstMember = mock(Member.class);
-        when(newFirstMember.getId()).thenReturn(400L);
-        when(newFirstMember.getFcmToken()).thenReturn(null);
-        when(newFirst.getMember()).thenReturn(newFirstMember);
-        when(waitingRepository.findByStoreIdAndStatusOrderByTicketTimeAsc(
-                eq(storeId), eq(WaitingStatus.WAITING),
-                argThat(p -> p.getOffset() == 0)))
-                .thenReturn(new PageImpl<>(List.of(newFirst)));
 
         waitingService.postponeWaiting(waitingId, email);
 
-        // SSE는 발송되고, FCM은 토큰 없으므로 sendFirstInLinePush 내부에서 early return
-        verify(notificationService, times(1)).sendToClient(eq(400L), any());
-        verify(fcmService, times(1)).sendFirstInLinePush(eq(null), eq(storeId));
+        // 미루기는 대기열에 남아 있으므로 연결을 종료하지 않음
+        verify(eventPublisher).publishEvent(new WaitingQueueChangedEvent(storeId, true, true));
+        verify(eventPublisher, never()).publishEvent(any(WaitingConnectionCloseEvent.class));
     }
 
     @Test

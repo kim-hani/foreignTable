@@ -1,14 +1,16 @@
 package OneTwo.SmartWaiting.domain.waiting.scheduler;
 
 import OneTwo.SmartWaiting.common.scheduler.SchedulerLock;
-import OneTwo.SmartWaiting.domain.notification.service.NotificationService;
 import OneTwo.SmartWaiting.domain.store.repository.StoreRepository;
 import OneTwo.SmartWaiting.domain.store.service.StoreStatisticService;
 import OneTwo.SmartWaiting.domain.waiting.entity.Waiting;
 import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
+import OneTwo.SmartWaiting.domain.waiting.event.WaitingConnectionCloseEvent;
+import OneTwo.SmartWaiting.domain.waiting.event.WaitingMessageEvent;
 import OneTwo.SmartWaiting.domain.waiting.repository.WaitingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +26,7 @@ import java.util.List;
 public class CleanupScheduler {
 
     private final WaitingRepository waitingRepository;
-    private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
     private final StoreStatisticService storeStatisticService;
     private final SchedulerLock schedulerLock;
 
@@ -46,21 +48,15 @@ public class CleanupScheduler {
 
         int cleanupCount = 0;
 
+        String message = "영업 시간이 종료되어 대기가 자동 취소되었습니다. 이용에 불편을 드려 정말 죄송합니다.";
         for(Waiting waiting : ghostWaitings){
             waiting.changeStatus(WaitingStatus.CANCEL);
             cleanupCount++;
-        }
 
-        // SSE 알림 전 상태 변경을 DB에 반영
-        waitingRepository.flush();
-
-        String message = "영업 시간이 종료되어 대기가 자동 취소되었습니다. 이용에 불편을 드려 정말 죄송합니다.";
-        for(Waiting waiting : ghostWaitings){
+            // 커밋 후 발행 순서대로 처리됨 — 연결을 끊기 전에 안내 메시지가 먼저 전달되도록 메시지 → 종료 순으로 발행
             Long memberId = waiting.getMember().getId();
-
-            // 연결을 끊기 전에 안내 메시지를 먼저 보내야 전달됨
-            notificationService.sendToClient(memberId, message);
-            notificationService.closeConnection(memberId);
+            eventPublisher.publishEvent(new WaitingMessageEvent(memberId, message));
+            eventPublisher.publishEvent(new WaitingConnectionCloseEvent(memberId));
         }
 
         log.info("유령 웨이팅 정리 작업 완료. 총 {}건 정리됨", cleanupCount);

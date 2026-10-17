@@ -95,7 +95,7 @@ OneTwo.SmartWaiting
 | 물리 삭제 금지, `softDelete()` 사용 | 데이터 이력 보존 |
 | 모든 예외: `BusinessException(ErrorCode.XXX)` | 통일된 에러 응답 형식 |
 | 새 예외 클래스 생성 금지 | `ErrorCode` enum 항목 추가로 대체 |
-| SSE 알림 전 `waitingRepository.flush()` 필수 | 상태 변경 DB 반영 후 알림 전송 순서 보장 |
+| 웨이팅 알림은 이벤트 발행 → `WaitingNotificationListener`(AFTER_COMMIT)에서 발송 | 커밋된 상태 변경에 대해서만 알림 (롤백 시 미발송) |
 | `Coordinate(longitude, latitude)` 순서 고정 | PostGIS WGS84 좌표계 규격 |
 
 > 전체 금지 사항 목록은 `shrimp-rules.md` § 12 참조

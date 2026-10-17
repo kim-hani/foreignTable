@@ -91,8 +91,8 @@ OneTwo.SmartWaiting
 - **등록 시 앞 팀이 2팀(내가 3번째)이면 즉시 SSE 알림 전송** — 대기 번호 기준 판단 금지
 
 ### 상위 3번째 알림 규칙
-- WAITING/CALL 상태 취소·착석·노쇼·미루기 발생 시 `isTop3()` 확인 후 `checkAndNotifyThirdInLine()` 호출
-- `waitingRepository.flush()` 후 알림 전송 (상태 변경 DB 반영 보장)
+- WAITING/CALL 상태 취소·착석·노쇼·미루기 발생 시 변경 전에 `isTop3()`/`isTop2()` 판정 후 `WaitingQueueChangedEvent` 발행
+- 알림은 `WaitingService`에서 직접 보내지 않고 이벤트(`WaitingMessageEvent`/`WaitingConnectionCloseEvent`/`WaitingQueueChangedEvent`)로 발행 → `WaitingNotificationListener`가 `@TransactionalEventListener(AFTER_COMMIT)`로 커밋 후 발송 (새 1·3번째 조회도 커밋 후 새 트랜잭션에서)
 - SSE 이벤트명: `"waiting-alert"`
 
 ### 리뷰 AI 요약
@@ -203,5 +203,5 @@ OneTwo.SmartWaiting
 - **물리 삭제(DELETE SQL) 금지** → `softDelete()` 사용
 - **Point 생성 시 위도/경도 순서 혼동 금지** → `Coordinate(longitude, latitude)` 순서 준수
 - **새 예외 클래스 생성 금지** → ErrorCode enum 항목 추가 후 BusinessException 사용
-- **SSE 상태 변경 후 flush() 없이 알림 전송 금지** → `waitingRepository.flush()` 후 알림 호출
+- **트랜잭션 안에서 SSE/FCM 직접 발송 금지** → 이벤트 발행 후 `WaitingNotificationListener`(AFTER_COMMIT)에서 발송
 - **리뷰 AI 요약 Redis 캐시 TTL 하드코딩 금지** → 리뷰 개수 기반 동적 TTL 로직 유지

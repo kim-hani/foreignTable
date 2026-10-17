@@ -2,10 +2,11 @@ package OneTwo.SmartWaiting.domain.waiting.scheduler;
 
 import OneTwo.SmartWaiting.common.scheduler.SchedulerLock;
 import OneTwo.SmartWaiting.domain.member.entity.Member;
-import OneTwo.SmartWaiting.domain.notification.service.NotificationService;
 import OneTwo.SmartWaiting.domain.store.service.StoreStatisticService;
 import OneTwo.SmartWaiting.domain.waiting.entity.Waiting;
 import OneTwo.SmartWaiting.domain.waiting.enums.WaitingStatus;
+import OneTwo.SmartWaiting.domain.waiting.event.WaitingConnectionCloseEvent;
+import OneTwo.SmartWaiting.domain.waiting.event.WaitingMessageEvent;
 import OneTwo.SmartWaiting.domain.waiting.repository.WaitingRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,13 +15,14 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Duration;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -38,7 +40,7 @@ class CleanupSchedulerTest {
     private WaitingRepository waitingRepository;
 
     @Mock
-    private NotificationService notificationService;
+    private ApplicationEventPublisher eventPublisher;
 
     @Mock
     private StoreStatisticService storeStatisticService;
@@ -59,7 +61,7 @@ class CleanupSchedulerTest {
     }
 
     @Test
-    @DisplayName("유령 웨이팅 정리 - 상태 변경 flush 후 안내 메시지를 보내고 나서 연결을 종료한다.")
+    @DisplayName("유령 웨이팅 정리 - 취소 처리 후 회원마다 안내 메시지 → 연결 종료 순으로 이벤트를 발행한다.")
     void cleanupGhostWaitings_SendsMessageBeforeClosingConnection() {
         // given
         givenLockAcquired(true);
@@ -75,12 +77,12 @@ class CleanupSchedulerTest {
         verify(waiting1).changeStatus(WaitingStatus.CANCEL);
         verify(waiting2).changeStatus(WaitingStatus.CANCEL);
 
-        InOrder inOrder = inOrder(waitingRepository, notificationService);
-        inOrder.verify(waitingRepository).flush();
-        inOrder.verify(notificationService).sendToClient(eq(1L), anyString());
-        inOrder.verify(notificationService).closeConnection(1L);
-        inOrder.verify(notificationService).sendToClient(eq(2L), anyString());
-        inOrder.verify(notificationService).closeConnection(2L);
+        // 커밋 후 리스너가 발행 순서대로 처리하므로 메시지가 연결 종료보다 먼저 발행돼야 함
+        InOrder inOrder = inOrder(eventPublisher);
+        inOrder.verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof WaitingMessageEvent m && m.memberId().equals(1L)));
+        inOrder.verify(eventPublisher).publishEvent(new WaitingConnectionCloseEvent(1L));
+        inOrder.verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof WaitingMessageEvent m && m.memberId().equals(2L)));
+        inOrder.verify(eventPublisher).publishEvent(new WaitingConnectionCloseEvent(2L));
     }
 
     @Test
@@ -95,8 +97,7 @@ class CleanupSchedulerTest {
         cleanupScheduler.cleanupGhostWaitings();
 
         // then
-        verify(notificationService, never()).sendToClient(anyLong(), anyString());
-        verify(notificationService, never()).closeConnection(anyLong());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
