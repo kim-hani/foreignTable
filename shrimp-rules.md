@@ -76,7 +76,7 @@ OneTwo.SmartWaiting
 ### Waiting
 - `queueNumber`: 등록 시점의 순번 (이후 변경 안 됨), 실제 순위는 `ticketTime`으로 계산
 - `ticketTime` 기준으로 순서 정렬 — 미루기(`postpone()`) 시 `ticketTime = LocalDateTime.now()` 갱신
-- `postponedCount` 최대 2, 초과 시 `IllegalStateException` (entity 내부)
+- `postponedCount` 최대 2, 초과 시 `BusinessException(POSTPONE_LIMIT_EXCEEDED)` (entity 내부)
 - Status: `WAITING → CALL → SEATED` (정상) / `CANCEL`, `NOSHOW` (이탈)
 
 ---
@@ -86,9 +86,9 @@ OneTwo.SmartWaiting
 ### 대기 등록
 - blacklisted 회원 차단 먼저 확인
 - 동일 가게 WAITING 상태 중복 등록 차단
-- `queueNumber = 현재 (WAITING+CALL) 수 + 1`
-- `expectedWaitMin = queueNumber * store.averageWaiting`
-- **등록 후 queueNumber == 3이면 즉시 SSE 알림 전송**
+- `queueNumber = 영업일(새벽 4시 기준) 내 해당 가게 최대 발급 번호 + 1` (`findMaxQueueNumberSince`) — 남은 팀 수 + 1로 계산 금지(입장·취소 후 번호 재발급됨)
+- `expectedWaitMin = 앞 팀 수(WAITING+CALL) * store.averageWaiting`
+- **등록 시 앞 팀이 2팀(내가 3번째)이면 즉시 SSE 알림 전송** — 대기 번호 기준 판단 금지
 
 ### 상위 3번째 알림 규칙
 - WAITING/CALL 상태 취소·착석·노쇼·미루기 발생 시 `isTop3()` 확인 후 `checkAndNotifyThirdInLine()` 호출

@@ -56,7 +56,7 @@ public class Waiting extends BaseEntity {
 
     public void postpone(){
         if(this.postponedCount >= 2)
-            throw new IllegalStateException("더 이상 대기 순서를 미룰 수 없습니다.");
+            throw new BusinessException(ErrorCode.POSTPONE_LIMIT_EXCEEDED);
         this.postponedCount++;
         this.ticketTime = LocalDateTime.now();  // 티켓 시각을 현재로 → 맨 뒤로 이동
     }
@@ -173,13 +173,13 @@ WaitingService.registerWaiting()
   │
   ⑥ 이미 대기 중인가? ─────────────▶ 중복이면 WAITING_ALREADY_EXISTS
   │
-  ⑦ 내 순번 계산
-  │  myQueueNumber = (현재 WAITING+CALL 수) + 1
-  │  expectedWaitMin = myQueueNumber × store.averageWaiting
+  ⑦ 대기 번호 발급 · 예상 대기 계산
+  │  myQueueNumber = (영업일 내 최대 발급 번호) + 1      ← 새벽 4시 기준
+  │  expectedWaitMin = (앞 팀 수: WAITING+CALL) × store.averageWaiting
   │
   ⑧ Waiting 저장 (status=WAITING, ticketTime=now)
   │
-  ⑨ 내가 3번째면? ──▶ SSE 알림 "대기 순번이 3번째입니다!"
+  ⑨ 앞 팀이 2팀(내가 3번째)이면? ──▶ SSE 알림 "대기 순번이 3번째입니다!"
   │
   ▼
 waitingId 반환
@@ -190,8 +190,8 @@ waitingId 반환
 - **① ② 전제 조건**: 식당·회원이 존재하는지 먼저 확인.
 - **③ ④ 가게 전체 조건**: 접수 중단·만석 여부 확인.
 - **⑤ ⑥ 손님 개인 조건**: 블랙리스트·중복 등록 여부 확인.
-- **⑦ 순번 계산**: 모든 관문 통과 후 "현재 WAITING+CALL 수 + 1" → **락이 보장하는 최신 값** 위에서 계산.
-- **⑧ ⑨ 저장·알림**: 저장 후 내가 마침 3번째면 그 손님에게만 SSE 안내 발송.
+- **⑦ 번호 발급**: 모든 관문 통과 후 "영업일 내 최대 발급 번호 + 1" → **락이 보장하는 최신 값** 위에서 발급. "남은 팀 수 + 1"로 계산하면 앞 팀이 입장·취소한 뒤 이미 나간 번호가 다시 발급되므로 사용하지 않는다. 영업일 경계(새벽 4시)는 남은 대기를 모두 종료하는 `CleanupScheduler`와 같다.
+- **⑧ ⑨ 저장·알림**: 저장 후 앞 팀이 2팀(내가 3번째)이면 그 손님에게만 SSE 안내 발송. 대기 번호와 실제 순번은 다를 수 있으므로 번호로 판단하지 않는다.
 
 ---
 
@@ -299,7 +299,7 @@ public WaitingStatusResponse getWaitingStatus(Long waitingId, String email) {
   → WAITING 상태인가? (아니면 INVALID_WAITING_STATUS)
   → 알림대상 사전판정
   → waiting.postpone()  ── postponedCount++, ticketTime=now (맨 뒤로)
-       └─ 이미 2회 미뤘으면 IllegalStateException
+       └─ 이미 2회 미뤘으면 BusinessException(POSTPONE_LIMIT_EXCEEDED)
   → flush()
   → 내가 빠진 자리의 3번째·1번째 손님에게 알림
 ```
