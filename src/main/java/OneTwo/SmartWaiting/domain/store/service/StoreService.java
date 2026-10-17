@@ -128,8 +128,20 @@ public class StoreService {
 
     public Slice<StoreResponseDto> searchStores(String name, String categoryStr, Pageable pageable){
         StoreCategory category = (categoryStr != null && !categoryStr.isBlank()) ? StoreCategory.from(categoryStr) : null;
+        boolean hasName = name != null && !name.isBlank();
 
-        return storeRepository.searchStoresByNameAndCategory(name,category,pageable)
-                .map(StoreResponseDto::from);
+        // 조건 조합마다 전용 쿼리 사용 (삭제된 식당 제외, 와일드카드 이스케이프)
+        Slice<Store> stores;
+        if (hasName && category != null) {
+            stores = storeRepository.findByIsDeletedFalseAndNameContainingAndCategory(name, category, pageable);
+        } else if (hasName) {
+            stores = storeRepository.findByIsDeletedFalseAndNameContaining(name, pageable);
+        } else if (category != null) {
+            stores = storeRepository.findByIsDeletedFalseAndCategory(category, pageable);
+        } else {
+            stores = storeRepository.findByIsDeletedFalse(pageable);
+        }
+
+        return stores.map(StoreResponseDto::from);
     }
 }

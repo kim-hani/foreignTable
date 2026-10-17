@@ -13,6 +13,12 @@ spring:
       host: localhost
       port: 6379
 
+  # Hibernate가 만들 수 없는 인덱스(GIST 표현식, GIN trigram) 생성
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:db/store-search-indexes.sql
+
   datasource:
     url: jdbc:postgresql://localhost:5433/smartwaiting
     username: ${DB_USERNAME}
@@ -24,6 +30,8 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: create
+    # Hibernate가 테이블을 만든 뒤에 sql.init 스크립트(검색 인덱스)를 실행하도록 순서 보장
+    defer-datasource-initialization: true
     properties:
       hibernate:
         format_sql: true
